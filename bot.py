@@ -60,7 +60,8 @@ class TicTacToeView(View):
             await self.disable_buttons(interaction)
             ganador = self.game.jugadores.get(self.game.jugador_actual, "Bot")
             await interaction.message.channel.send(f"🏆 ¡{ganador} ha ganado con {FICHAS[self.game.jugador_actual]}!")
-            await interaction.response.defer()
+            if not interaction.response.is_done():
+                await interaction.response.defer()
             # Eliminamos la partida para permitir iniciar una nueva
             if interaction.channel.id in partidas:
                 del partidas[interaction.channel.id]
@@ -69,8 +70,8 @@ class TicTacToeView(View):
             self.game.partida_activa = False
             await self.disable_buttons(interaction)
             await interaction.message.channel.send("😲 ¡Empate!")
-            await interaction.response.defer()
-            # Eliminamos la partida para permitir iniciar una nueva
+            if not interaction.response.is_done():
+                await interaction.response.defer()
             if interaction.channel.id in partidas:
                 del partidas[interaction.channel.id]
             return True
@@ -93,7 +94,7 @@ class TicTacToeView(View):
             await interaction.response.send_message("⚠️ No hay una partida en curso. Usa `!iniciar` para jugar.", ephemeral=True)
             return
 
-        # Bloquear clics de usuarios que no sean el jugador que tiene el turno.
+        # Bloqueo de clics fuera de turno
         current_player = self.game.jugadores[self.game.jugador_actual]
         if interaction.user.mention != current_player:
             await interaction.response.send_message("⚠️ No es tu turno.", ephemeral=True)
@@ -137,7 +138,7 @@ async def iniciar(ctx, jugador2: discord.Member = None):
     view = TicTacToeView(game)
     embed = discord.Embed(
         title="🎲 ¡Tres en raya!",
-        description=f"{game.jugadores['X']} contra {game.jugadores['O']} \n\n🎮 ¡QUE COMIENCE EL JUEGO! 🎮\n\n🔄 Turno de {game.jugadores[game.jugador_actual]} con {FICHAS["X"]} !",
+        description=f"{game.jugadores['X']} contra {game.jugadores['O']} \n\n🎮 ¡QUE COMIENCE EL JUEGO! 🎮\n\n🔄 Turno de {game.jugadores[game.jugador_actual]} con {FICHAS['X']} !",
         color=discord.Color.blue()
     )
     await ctx.send(embed=embed, view=view)
