@@ -93,6 +93,12 @@ class TicTacToeView(View):
             await interaction.response.send_message("⚠️ No hay una partida en curso. Usa `!iniciar` para jugar.", ephemeral=True)
             return
 
+        # Bloquear clics de usuarios que no sean el jugador que tiene el turno.
+        current_player = self.game.jugadores[self.game.jugador_actual]
+        if interaction.user.mention != current_player:
+            await interaction.response.send_message("⚠️ No es tu turno.", ephemeral=True)
+            return
+
         if self.game.tablero[index] != " ":
             await interaction.response.send_message("❌ Esa casilla ya está ocupada.", ephemeral=True)
             return
@@ -123,17 +129,15 @@ async def iniciar(ctx, jugador2: discord.Member = None):
     if jugador2 is None:
         game.modo_vs_bot = True
         game.jugadores = {"X": ctx.author.mention, "O": bot.user.mention}
-        # await ctx.send(f"🎮 {ctx.author.mention} jugará contra {bot.user.mention} ¡Buena suerte! 🚀")
     else:
         game.jugadores = {"X": ctx.author.mention, "O": jugador2.mention}
-        # await ctx.send(f"🎮 {ctx.author.mention} vs {jugador2.mention}. ¡A jugar!")
 
     partidas[ctx.channel.id] = game
 
     view = TicTacToeView(game)
     embed = discord.Embed(
         title="🎲 ¡Tres en raya!",
-        description=f"{game.jugadores['X']} contra {game.jugadores['O']} \n\n🎮 ¡QUE COMIENCE EL JUEGO! 🎮\n\n🔄 Turno de {game.jugadores[game.jugador_actual]}",
+        description=f"{game.jugadores['X']} contra {game.jugadores['O']} \n\n🎮 ¡QUE COMIENCE EL JUEGO! 🎮\n\n🔄 Turno de {game.jugadores[game.jugador_actual]} con {FICHAS["X"]} !",
         color=discord.Color.blue()
     )
     await ctx.send(embed=embed, view=view)
