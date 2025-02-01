@@ -62,7 +62,6 @@ class TicTacToeView(View):
             await interaction.message.channel.send(f"🏆 ¡{ganador} ha ganado con {FICHAS[self.game.jugador_actual]}!")
             if not interaction.response.is_done():
                 await interaction.response.defer()
-            # Eliminamos la partida para permitir iniciar una nueva
             if interaction.channel.id in partidas:
                 del partidas[interaction.channel.id]
             return True
@@ -77,13 +76,62 @@ class TicTacToeView(View):
             return True
         return False
 
+    def evaluate(self, board):
+        """Devuelve 10 si gana 'O', -10 si gana 'X', 0 si no hay ganador."""
+        wins = [
+            (0,1,2), (3,4,5), (6,7,8),
+            (0,3,6), (1,4,7), (2,5,8),
+            (0,4,8), (2,4,6)
+        ]
+        for a, b, c in wins:
+            if board[a] == board[b] == board[c] and board[a] != " ":
+                return 10 if board[a] == "O" else -10
+        return 0
+
+    def minimax(self, board, depth, is_maximizing):
+        score = self.evaluate(board)
+        # Si alguien ha ganado, devolvemos el score
+        if score == 10 or score == -10:
+            return score
+        # Empate
+        if " " not in board:
+            return 0
+
+        if is_maximizing:
+            best = -1000
+            for i in range(9):
+                if board[i] == " ":
+                    board[i] = "O"
+                    best = max(best, self.minimax(board, depth + 1, False))
+                    board[i] = " "
+            return best
+        else:
+            best = 1000
+            for i in range(9):
+                if board[i] == " ":
+                    board[i] = "X"
+                    best = min(best, self.minimax(board, depth + 1, True))
+                    board[i] = " "
+            return best
+
     async def bot_move(self, interaction):
-        posibles_movimientos = [i for i in range(9) if self.game.tablero[i] == " "]
-        if posibles_movimientos:
-            movimiento = random.choice(posibles_movimientos)
-            self.game.tablero[movimiento] = "O"
-            self.children[movimiento].label = FICHAS["O"]
-            self.children[movimiento].disabled = True
+        # Usar minimax para encontrar el mejor movimiento
+        best_score = -1000
+        best_move = None
+        board = self.game.tablero[:]  # copia del tablero
+        for i in range(9):
+            if board[i] == " ":
+                board[i] = "O"
+                score = self.minimax(board, 0, False)
+                board[i] = " "
+                if score > best_score:
+                    best_score = score
+                    best_move = i
+
+        if best_move is not None:
+            self.game.tablero[best_move] = "O"
+            self.children[best_move].label = FICHAS["O"]
+            self.children[best_move].disabled = True
             if await self.check_endgame(interaction):
                 return
         self.game.jugador_actual = "X"
@@ -125,7 +173,7 @@ async def iniciar(ctx, jugador2: discord.Member = None):
 
     game = TicTacToeGame()
     game.partida_activa = True
-    
+
     # Si no se especifica jugador2, se juega contra el bot
     if jugador2 is None:
         game.modo_vs_bot = True
