@@ -36,6 +36,44 @@ class TicTacToeGame:
             if self.tablero[a] == self.tablero[b] == self.tablero[c] and self.tablero[a] != " ":
                 return True
         return False
+    
+    def minimax(self, is_maximizing):
+        if self.verificar_ganador():
+            return -1 if is_maximizing else 1
+        elif " " not in self.tablero:
+            return 0
+
+        if is_maximizing:
+            best_score = -float("inf")
+            for i in range(9):
+                if self.tablero[i] == " ":
+                    self.tablero[i] = "O"
+                    score = self.minimax(False)
+                    self.tablero[i] = " "
+                    best_score = max(score, best_score)
+            return best_score
+        else:
+            best_score = float("inf")
+            for i in range(9):
+                if self.tablero[i] == " ":
+                    self.tablero[i] = "X"
+                    score = self.minimax(True)
+                    self.tablero[i] = " "
+                    best_score = min(score, best_score)
+            return best_score
+
+    def mejor_movimiento(self):
+        best_score = -float("inf")
+        best_move = None
+        for i in range(9):
+            if self.tablero[i] == " ":
+                self.tablero[i] = "O"
+                score = self.minimax(False)
+                self.tablero[i] = " "
+                if score > best_score:
+                    best_score = score
+                    best_move = i
+        return best_move
 
 class TicTacToeView(View):
     def __init__(self, game):
@@ -57,7 +95,7 @@ class TicTacToeView(View):
             await self.disable_buttons(interaction)
             ganador = self.game.jugadores.get(self.game.jugador_actual, "Bot")
             await interaction.message.channel.send(f"🏆 ¡{ganador} ha ganado con {FICHAS[self.game.jugador_actual]}!")
-            await interaction.response.defer()  # Evita el error de interacción
+            await interaction.response.defer()
             return True
         elif " " not in self.game.tablero:
             self.game.partida_activa = False
@@ -68,9 +106,8 @@ class TicTacToeView(View):
         return False
 
     async def bot_move(self, interaction):
-        posibles_movimientos = [i for i in range(9) if self.game.tablero[i] == " "]
-        if posibles_movimientos:
-            movimiento = random.choice(posibles_movimientos)
+        movimiento = self.game.mejor_movimiento()
+        if movimiento is not None:
             self.game.tablero[movimiento] = "O"
             self.children[movimiento].label = FICHAS["O"]
             self.children[movimiento].disabled = True
@@ -102,23 +139,6 @@ class TicTacToeView(View):
             await self.bot_move(interaction)
 
 @bot.command()
-async def iniciar(ctx, jugador2: discord.Member = None):
-    game = TicTacToeGame()
-    if game.partida_activa:
-        await ctx.send("⚠️ Ya hay una partida en curso. Usa `!reiniciar` si quieres empezar de nuevo.")
-        return
-
-    if jugador2 is None:
-        await ctx.send("⚠️ Necesitas especificar al segundo jugador para una partida entre jugadores.")
-        return
-
-    game.partida_activa = True
-    game.jugadores = {"X": ctx.author.mention, "O": jugador2.mention}
-    view = TicTacToeView(game)
-    embed = discord.Embed(title="🎲 ¡Tres en raya!", description=f"{game.jugadores['X']} contra {game.jugadores['O']} 🎮\n\n🔄 Turno de {game.jugadores[game.jugador_actual]}", color=discord.Color.blue())
-    await ctx.send(embed=embed, view=view)
-
-@bot.command()
 async def iniciar_bot(ctx):
     game = TicTacToeGame()
     if game.partida_activa:
@@ -131,9 +151,5 @@ async def iniciar_bot(ctx):
     view = TicTacToeView(game)
     embed = discord.Embed(title="🎲 ¡Tres en raya!", description=f"{game.jugadores['X']} contra {game.jugadores['O']} \n\n🎮¡Que comience el juego!🎮\n\n🔄 Turno de {game.jugadores[game.jugador_actual]}", color=discord.Color.blue())
     await ctx.send(embed=embed, view=view)
-
-@bot.command()
-async def reiniciar(ctx):
-    await ctx.send("🔄 La partida ha sido reiniciada. Usa `!iniciar` para jugar de nuevo.")
 
 bot.run(TOKEN)
