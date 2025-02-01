@@ -120,7 +120,7 @@ async def iniciar(ctx, jugador2: discord.Member = None):
     partidas[ctx.channel.id] = game
 
     view = TicTacToeView(game)
-    embed = discord.Embed(title="🎲 ¡Tres en raya!", description=f"{game.jugadores['X']} contra {game.jugadores['O']} 🎮\n\n🔄 Turno de {game.jugadores[game.jugador_actual]}", color=discord.Color.blue())
+    embed = discord.Embed(title="🎲 ¡Tres en raya!", description=f"{game.jugadores['X']} contra {game.jugadores['O']} \n\n🎮 ¡QUE COMIENCE EL JUEGO! 🎮\n\n🔄 Turno de {game.jugadores[game.jugador_actual]}", color=discord.Color.blue())
     await ctx.send(embed=embed, view=view)
 
 @bot.command()
