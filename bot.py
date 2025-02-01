@@ -22,7 +22,7 @@ partida_activa = False
 jugadores = {}
 
 # Emojis para fichas
-fichas = {"X": "❌", "O": "⭕", " ": "⬜"}
+fichas = {"X": "❎", "O": "🅾️", " ": "⬜"}
 
 # Función para verificar el ganador
 def verificar_ganador():
@@ -147,7 +147,7 @@ async def iniciar_bot(ctx):
     partida_activa = True
     jugadores = {"X": ctx.author.mention, "O": "🤖 Bot"}
     
-    mensaje = f"{jugadores['X']} contra {jugadores['O']} 🤖 ¡Que comience la partida!"
+    mensaje = f"{jugadores['X']} contra {jugadores['O']} \n\n👾 ¡Que comience la partida!"
 
     view = TicTacToeView()
     for i in range(9):
