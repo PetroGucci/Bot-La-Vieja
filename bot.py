@@ -61,12 +61,18 @@ class TicTacToeView(View):
             ganador = self.game.jugadores.get(self.game.jugador_actual, "Bot")
             await interaction.message.channel.send(f"🏆 ¡{ganador} ha ganado con {FICHAS[self.game.jugador_actual]}!")
             await interaction.response.defer()
+            # Eliminamos la partida para permitir iniciar una nueva
+            if interaction.channel.id in partidas:
+                del partidas[interaction.channel.id]
             return True
         elif " " not in self.game.tablero:
             self.game.partida_activa = False
             await self.disable_buttons(interaction)
             await interaction.message.channel.send("😲 ¡Empate!")
             await interaction.response.defer()
+            # Eliminamos la partida para permitir iniciar una nueva
+            if interaction.channel.id in partidas:
+                del partidas[interaction.channel.id]
             return True
         return False
 
@@ -110,17 +116,26 @@ async def iniciar(ctx, jugador2: discord.Member = None):
         await ctx.send("⚠️ Ya hay una partida en curso en este canal. Usa `!reiniciar` si quieres empezar de nuevo.")
         return
 
-    if jugador2 is None:
-        await ctx.send("⚠️ Necesitas especificar al segundo jugador para una partida entre jugadores.")
-        return
-
     game = TicTacToeGame()
     game.partida_activa = True
-    game.jugadores = {"X": ctx.author.mention, "O": jugador2.mention}
+    
+    # Si no se especifica jugador2, se juega contra el bot
+    if jugador2 is None:
+        game.modo_vs_bot = True
+        game.jugadores = {"X": ctx.author.mention, "O": bot.user.mention}
+        # await ctx.send(f"🎮 {ctx.author.mention} jugará contra {bot.user.mention} ¡Buena suerte! 🚀")
+    else:
+        game.jugadores = {"X": ctx.author.mention, "O": jugador2.mention}
+        # await ctx.send(f"🎮 {ctx.author.mention} vs {jugador2.mention}. ¡A jugar!")
+
     partidas[ctx.channel.id] = game
 
     view = TicTacToeView(game)
-    embed = discord.Embed(title="🎲 ¡Tres en raya!", description=f"{game.jugadores['X']} contra {game.jugadores['O']} \n\n🎮 ¡QUE COMIENCE EL JUEGO! 🎮\n\n🔄 Turno de {game.jugadores[game.jugador_actual]}", color=discord.Color.blue())
+    embed = discord.Embed(
+        title="🎲 ¡Tres en raya!",
+        description=f"{game.jugadores['X']} contra {game.jugadores['O']} \n\n🎮 ¡QUE COMIENCE EL JUEGO! 🎮\n\n🔄 Turno de {game.jugadores[game.jugador_actual]}",
+        color=discord.Color.blue()
+    )
     await ctx.send(embed=embed, view=view)
 
 @bot.command()
