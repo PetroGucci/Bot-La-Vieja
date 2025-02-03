@@ -19,7 +19,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # Emojis para fichas
 FICHAS = {"X": "❎", "O": "🅾️", " ": "⬜"}
 
-# Almacenar partidas activas (clave: ID del canal)
+# Almacenar partidas activas (clave: ID del mensaje)
 partidas = {}
 
 class TicTacToeGame:
@@ -42,9 +42,10 @@ class TicTacToeGame:
         return False
 
 class TicTacToeView(View):
-    def __init__(self, game):
+    def __init__(self, game, message_id):
         super().__init__(timeout=60)
         self.game = game
+        self.message_id = message_id
         # Crear 9 botones para las casillas
         for i in range(9):
             button = Button(style=discord.ButtonStyle.secondary, label=FICHAS[self.game.tablero[i]], row=i // 3)
@@ -66,8 +67,8 @@ class TicTacToeView(View):
             await interaction.message.channel.send(f"🏆 ¡{ganador} ha ganado con {FICHAS[self.game.jugador_actual]} !")
             if not interaction.response.is_done():
                 await interaction.response.defer()
-            if interaction.channel.id in partidas:
-                del partidas[interaction.channel.id]
+            if self.message_id in partidas:
+                del partidas[self.message_id]
             return True
         elif " " not in self.game.tablero:
             self.game.partida_activa = False
@@ -75,8 +76,8 @@ class TicTacToeView(View):
             await interaction.message.channel.send("😲 ¡Empate!")
             if not interaction.response.is_done():
                 await interaction.response.defer()
-            if interaction.channel.id in partidas:
-                del partidas[interaction.channel.id]
+            if self.message_id in partidas:
+                del partidas[self.message_id]
             return True
         return False
 
@@ -173,10 +174,6 @@ class TicTacToeView(View):
 
 @bot.tree.command(name="iniciar", description="Inicia una partida de Tres en Raya")
 async def iniciar(interaction: discord.Interaction, oponente: discord.Member = None):
-    if interaction.channel.id in partidas:
-        await interaction.response.send_message("⚠️ Ya hay una partida en curso en este canal. Usa `/reiniciar` si quieres empezar de nuevo.", ephemeral=True)
-        return
-
     game = TicTacToeGame()
     game.partida_activa = True
 
@@ -187,20 +184,19 @@ async def iniciar(interaction: discord.Interaction, oponente: discord.Member = N
     else:
         game.jugadores = {"X": interaction.user.mention, "O": oponente.mention}
 
-    partidas[interaction.channel.id] = game
-
-    view = TicTacToeView(game)
+    view = TicTacToeView(game, interaction.id)
     embed = discord.Embed(
         title="🎲 ¡Tres en raya!",
         description=f"{game.jugadores['X']} contra {game.jugadores['O']} \n\n🎮 ¡QUE COMIENCE EL JUEGO! 🎮\n\n🔄 Turno de {game.jugadores[game.jugador_actual]} con {FICHAS['X']} !",
         color=discord.Color.blue()
     )
     await interaction.response.send_message(embed=embed, view=view)
+    partidas[interaction.id] = game
 
 @bot.tree.command(name="reiniciar", description="Reinicia la partida actual")
 async def reiniciar(interaction: discord.Interaction):
-    if interaction.channel.id in partidas:
-        del partidas[interaction.channel.id]
+    if interaction.id in partidas:
+        del partidas[interaction.id]
         await interaction.response.send_message("🔄 La partida ha sido reiniciada. Usa `/iniciar` para jugar de nuevo.")
     else:
         await interaction.response.send_message("⚠️ No hay ninguna partida activa para reiniciar.")
