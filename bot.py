@@ -43,7 +43,7 @@ class TicTacToeGame:
 
 class TicTacToeView(View):
     def __init__(self, game, message_id):
-        super().__init__(timeout=60)
+        super().__init__(timeout=300)
         self.game = game
         self.message_id = message_id
         # Crear 9 botones para las casillas
