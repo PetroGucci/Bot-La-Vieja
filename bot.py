@@ -246,17 +246,21 @@ class TicTacToeView(View):
             await self.bot_move(interaction)
 
 @bot.tree.command(name="iniciar", description="Inicia una partida de Tres en Raya")
-async def iniciar(interaction: discord.Interaction, oponente: discord.Member = None, dificultad: str = None):
+@app_commands.describe(oponente="Selecciona un oponente para jugar")
+@app_commands.describe(dificultad="Selecciona la dificultad del juego")
+@app_commands.choices(dificultad=[
+    app_commands.Choice(name="Fácil", value="facil"),
+    app_commands.Choice(name="Medio", value="medio"),
+    app_commands.Choice(name="Difícil", value="dificil")
+])
+async def iniciar(interaction: discord.Interaction, oponente: discord.Member = None, dificultad: app_commands.Choice[str] = None):
     if oponente is not None and oponente.id != bot.user.id and dificultad is not None:
         await interaction.response.send_message("⚠️ El nivel de dificultad solo se puede ajustar al jugar contra el bot. Iniciando partida contra jugador.", ephemeral=True)
         dificultad = None
 
     if oponente is None or oponente.id == bot.user.id:
         # Jugar contra el bot: se utiliza la dificultad especificada (por defecto "dificil")
-        dificultad = dificultad.lower() if dificultad else "dificil"
-        if dificultad not in ["facil", "medio", "dificil"]:
-            await interaction.response.send_message("⚠️ Dificultad inválida. Usa: facil, medio o dificil.", ephemeral=True)
-            return
+        dificultad = dificultad.value if dificultad else "dificil"
         game = TicTacToeGame(dificultad=dificultad)
         game.modo_vs_bot = True
         game.jugadores = {"X": interaction.user.mention, "O": bot.user.mention}
@@ -291,7 +295,7 @@ async def stats_command(interaction: discord.Interaction):
     user_stats = stats.get(user, {"wins": 0, "losses": 0, "draws": 0})
     embed = discord.Embed(
         title="📊 Tus estadísticas",
-        description=f"Wins: {user_stats['wins']}\nLosses: {user_stats['losses']}\nDraws: {user_stats['draws']}",
+        description=f"Victorias: {user_stats['wins']}\nDerrotas: {user_stats['losses']}\nEmpates: {user_stats['draws']}",
         color=discord.Color.green()
     )
     await interaction.response.send_message(embed=embed)
