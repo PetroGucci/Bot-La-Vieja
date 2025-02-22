@@ -2,6 +2,7 @@ import discord
 import random
 import os
 import webserver
+import json
 from discord.ext import commands
 from discord import app_commands
 from discord.ui import View, Button
@@ -26,6 +27,26 @@ partidas = {}
 # Almacenar estadísticas de jugadores
 stats = {}
 
+def save_partidas():
+    with open("partidas.json", "w") as f:
+        json.dump(partidas, f, default=lambda o: o.__dict__, indent=4)
+
+def load_partidas():
+    global partidas
+    if os.path.exists("partidas.json"):
+        with open("partidas.json", "r") as f:
+            partidas = json.load(f)
+
+def save_stats():
+    with open("stats.json", "w") as f:
+        json.dump(stats, f, indent=4)
+
+def load_stats():
+    global stats
+    if os.path.exists("stats.json"):
+        with open("stats.json", "r") as f:
+            stats = json.load(f)
+
 def update_stats(winner, loser):
     """Actualiza las estadísticas tras una victoria."""
     for player in [winner, loser]:
@@ -33,6 +54,7 @@ def update_stats(winner, loser):
             stats[player] = {"wins": 0, "losses": 0, "draws": 0}
     stats[winner]["wins"] += 1
     stats[loser]["losses"] += 1
+    save_stats()
 
 def update_draw(player1, player2):
     """Actualiza las estadísticas en caso de empate."""
@@ -40,6 +62,7 @@ def update_draw(player1, player2):
         if player not in stats:
             stats[player] = {"wins": 0, "losses": 0, "draws": 0}
         stats[player]["draws"] += 1
+    save_stats()
 
 class TicTacToeGame:
     def __init__(self, dificultad="dificil"):
@@ -86,11 +109,12 @@ class TicTacToeView(View):
             perdedor_marker = "X" if ganador_marker == "O" else "O"
             perdedor = self.game.jugadores[perdedor_marker]
             update_stats(ganador, perdedor)
-            await interaction.message.reply(f"🏆 ¡{ganador} ha ganado con {FICHAS[ganador_marker]}!\n📊Estadísticas actualizadas.")
+            await interaction.message.reply(f"🏆 ¡{ganador} ha ganado con {FICHAS[ganador_marker]}!\n📊 Estadísticas actualizadas.")
             if not interaction.response.is_done():
                 await interaction.response.defer()
             if self.message_id in partidas:
                 del partidas[self.message_id]
+                save_partidas()
             return True
         elif " " not in self.game.tablero:
             self.game.partida_activa = False
@@ -101,6 +125,7 @@ class TicTacToeView(View):
                 await interaction.response.defer()
             if self.message_id in partidas:
                 del partidas[self.message_id]
+                save_partidas()
             return True
         return False
 
@@ -249,11 +274,13 @@ async def iniciar(interaction: discord.Interaction, oponente: discord.Member = N
     )
     await interaction.response.send_message(embed=embed, view=view)
     partidas[interaction.id] = game
+    save_partidas()
 
 @bot.tree.command(name="reiniciar", description="Reinicia la partida actual")
 async def reiniciar(interaction: discord.Interaction):
     if interaction.id in partidas:
         del partidas[interaction.id]
+        save_partidas()
         await interaction.response.send_message("🔄 La partida ha sido reiniciada. Usa `/iniciar` para jugar de nuevo.")
     else:
         await interaction.response.send_message("⚠️ No hay ninguna partida activa para reiniciar.")
@@ -271,6 +298,8 @@ async def stats_command(interaction: discord.Interaction):
 
 @bot.event
 async def on_ready():
+    load_partidas()
+    load_stats()
     await bot.tree.sync()
     print(f"Bot conectado como {bot.user}")
 
