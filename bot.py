@@ -24,7 +24,7 @@ FICHAS = {"X": "❎", "O": "🅾️", " ": "⬜"}
 # Almacenar partidas activas (clave: ID del mensaje)
 partidas = {}
 
-# Almacenar estadísticas de jugadores
+# Almacenar estadísticas de jugadores por servidor
 stats = {}
 
 def save_partidas():
@@ -47,21 +47,25 @@ def load_stats():
         with open("stats.json", "r") as f:
             stats = json.load(f)
 
-def update_stats(winner, loser):
+def update_stats(guild_id, winner, loser):
     """Actualiza las estadísticas tras una victoria."""
+    if guild_id not in stats:
+        stats[guild_id] = {}
     for player in [winner, loser]:
-        if player not in stats:
-            stats[player] = {"wins": 0, "losses": 0, "draws": 0}
-    stats[winner]["wins"] += 1
-    stats[loser]["losses"] += 1
+        if player not in stats[guild_id]:
+            stats[guild_id][player] = {"wins": 0, "losses": 0, "draws": 0}
+    stats[guild_id][winner]["wins"] += 1
+    stats[guild_id][loser]["losses"] += 1
     save_stats()
 
-def update_draw(player1, player2):
+def update_draw(guild_id, player1, player2):
     """Actualiza las estadísticas en caso de empate."""
+    if guild_id not in stats:
+        stats[guild_id] = {}
     for player in [player1, player2]:
-        if player not in stats:
-            stats[player] = {"wins": 0, "losses": 0, "draws": 0}
-        stats[player]["draws"] += 1
+        if player not in stats[guild_id]:
+            stats[guild_id][player] = {"wins": 0, "losses": 0, "draws": 0}
+        stats[guild_id][player]["draws"] += 1
     save_stats()
 
 class TicTacToeGame:
@@ -108,7 +112,7 @@ class TicTacToeView(View):
             ganador = self.game.jugadores[ganador_marker]
             perdedor_marker = "X" if ganador_marker == "O" else "O"
             perdedor = self.game.jugadores[perdedor_marker]
-            update_stats(ganador, perdedor)
+            update_stats(interaction.guild.id, ganador, perdedor)
             await interaction.message.reply(f"🏆 ¡{ganador} ha ganado con {FICHAS[ganador_marker]}!\n📊 Estadísticas actualizadas.")
             if not interaction.response.is_done():
                 await interaction.response.defer()
@@ -119,7 +123,7 @@ class TicTacToeView(View):
         elif " " not in self.game.tablero:
             self.game.partida_activa = False
             await self.disable_buttons(interaction)
-            update_draw(self.game.jugadores["X"], self.game.jugadores["O"])
+            update_draw(interaction.guild.id, self.game.jugadores["X"], self.game.jugadores["O"])
             await interaction.message.reply("😲 ¡Empate!\n📊 Estadísticas actualizadas.")
             if not interaction.response.is_done():
                 await interaction.response.defer()
@@ -291,14 +295,16 @@ async def reiniciar(interaction: discord.Interaction):
 
 @bot.tree.command(name="stats", description="Muestra las estadísticas de tus partidas")
 async def stats_command(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)  # Defer the response to give more time
+    guild_id = interaction.guild.id
     user = interaction.user.mention
-    user_stats = stats.get(user, {"wins": 0, "losses": 0, "draws": 0})
+    user_stats = stats.get(guild_id, {}).get(user, {"wins": 0, "losses": 0, "draws": 0})
     embed = discord.Embed(
         title="📊 Tus estadísticas",
         description=f"Victorias: {user_stats['wins']}\nDerrotas: {user_stats['losses']}\nEmpates: {user_stats['draws']}",
         color=discord.Color.green()
     )
-    await interaction.response.send_message(embed=embed)
+    await interaction.followup.send(embed=embed, ephemeral=True)  # Use followup to send the actual message
 
 @bot.event
 async def on_ready():
