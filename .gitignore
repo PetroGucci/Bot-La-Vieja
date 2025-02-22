@@ -1,2 +1,9 @@
 # .gitignore
+
+# Archivos
 .env
+
+# Carpetas
+Bot/
+__pycache__/
+

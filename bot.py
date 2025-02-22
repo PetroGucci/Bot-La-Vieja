@@ -1,6 +1,7 @@
 import discord
 import random
 import os
+import webserver
 from discord.ext import commands
 from discord import app_commands
 from discord.ui import View, Button
@@ -206,4 +207,5 @@ async def on_ready():
     await bot.tree.sync()
     print(f"Bot conectado como {bot.user}")
 
+webserver.keep_alive()
 bot.run(TOKEN)
