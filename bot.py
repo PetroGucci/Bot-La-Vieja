@@ -64,7 +64,7 @@ class TicTacToeView(View):
             self.game.partida_activa = False
             await self.disable_buttons(interaction)
             ganador = self.game.jugadores.get(self.game.jugador_actual, "Bot")
-            await interaction.message.channel.send(f"🏆 ¡{ganador} ha ganado con {FICHAS[self.game.jugador_actual]} !")
+            await interaction.message.reply(f"🏆 ¡{ganador} ha ganado con {FICHAS[self.game.jugador_actual]} !")
             if not interaction.response.is_done():
                 await interaction.response.defer()
             if self.message_id in partidas:
@@ -73,7 +73,7 @@ class TicTacToeView(View):
         elif " " not in self.game.tablero:
             self.game.partida_activa = False
             await self.disable_buttons(interaction)
-            await interaction.message.channel.send("😲 ¡Empate!")
+            await interaction.message.reply("😲 ¡Empate!")
             if not interaction.response.is_done():
                 await interaction.response.defer()
             if self.message_id in partidas:
