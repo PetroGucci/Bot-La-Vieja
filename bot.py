@@ -23,13 +23,32 @@ FICHAS = {"X": "❎", "O": "🅾️", " ": "⬜"}
 # Almacenar partidas activas (clave: ID del mensaje)
 partidas = {}
 
+# Almacenar estadísticas de jugadores
+stats = {}
+
+def update_stats(winner, loser):
+    """Actualiza las estadísticas tras una victoria."""
+    for player in [winner, loser]:
+        if player not in stats:
+            stats[player] = {"wins": 0, "losses": 0, "draws": 0}
+    stats[winner]["wins"] += 1
+    stats[loser]["losses"] += 1
+
+def update_draw(player1, player2):
+    """Actualiza las estadísticas en caso de empate."""
+    for player in [player1, player2]:
+        if player not in stats:
+            stats[player] = {"wins": 0, "losses": 0, "draws": 0}
+        stats[player]["draws"] += 1
+
 class TicTacToeGame:
-    def __init__(self):
+    def __init__(self, dificultad="dificil"):
         self.tablero = [" "] * 9
         self.jugador_actual = "X"
         self.modo_vs_bot = False
         self.partida_activa = False
         self.jugadores = {}
+        self.dificultad = dificultad  # "facil", "medio", "dificil"
 
     def verificar_ganador(self):
         combinaciones_ganadoras = [
@@ -50,12 +69,10 @@ class TicTacToeView(View):
         # Crear 9 botones para las casillas
         for i in range(9):
             button = Button(style=discord.ButtonStyle.secondary, label=FICHAS[self.game.tablero[i]], row=i // 3)
-            # Usamos partial para asignar el índice correspondiente a cada botón
             button.callback = partial(self.handle_click, index=i)
             self.add_item(button)
     
     async def disable_buttons(self, interaction: discord.Interaction):
-        # Deshabilita todos los botones y edita el mensaje
         for child in self.children:
             child.disabled = True
         await interaction.message.edit(view=self)
@@ -64,8 +81,12 @@ class TicTacToeView(View):
         if self.game.verificar_ganador():
             self.game.partida_activa = False
             await self.disable_buttons(interaction)
-            ganador = self.game.jugadores.get(self.game.jugador_actual, "Bot")
-            await interaction.message.reply(f"🏆 ¡{ganador} ha ganado con {FICHAS[self.game.jugador_actual]} !")
+            ganador_marker = self.game.jugador_actual
+            ganador = self.game.jugadores[ganador_marker]
+            perdedor_marker = "X" if ganador_marker == "O" else "O"
+            perdedor = self.game.jugadores[perdedor_marker]
+            update_stats(ganador, perdedor)
+            await interaction.message.reply(f"🏆 ¡{ganador} ha ganado con {FICHAS[ganador_marker]}!\n📊Estadísticas actualizadas.")
             if not interaction.response.is_done():
                 await interaction.response.defer()
             if self.message_id in partidas:
@@ -74,7 +95,8 @@ class TicTacToeView(View):
         elif " " not in self.game.tablero:
             self.game.partida_activa = False
             await self.disable_buttons(interaction)
-            await interaction.message.reply("😲 ¡Empate!")
+            update_draw(self.game.jugadores["X"], self.game.jugadores["O"])
+            await interaction.message.reply("😲 ¡Empate!\n📊 Estadísticas actualizadas.")
             if not interaction.response.is_done():
                 await interaction.response.defer()
             if self.message_id in partidas:
@@ -83,7 +105,6 @@ class TicTacToeView(View):
         return False
 
     def evaluate(self, board):
-        """Devuelve 10 si gana 'O', -10 si gana 'X', 0 si no hay ganador."""
         wins = [
             (0, 1, 2), (3, 4, 5), (6, 7, 8),
             (0, 3, 6), (1, 4, 7), (2, 5, 8),
@@ -96,10 +117,8 @@ class TicTacToeView(View):
 
     def minimax(self, board, depth, is_maximizing):
         score = self.evaluate(board)
-        # Si hay un ganador, retornamos el score
         if score == 10 or score == -10:
             return score
-        # Empate
         if " " not in board:
             return 0
 
@@ -121,18 +140,49 @@ class TicTacToeView(View):
             return best
 
     async def bot_move(self, interaction: discord.Interaction):
-        # Usar minimax para elegir el mejor movimiento para "O"
-        best_score = -1000
+        board = self.game.tablero[:]
         best_move = None
-        board = self.game.tablero[:]  # Copia del tablero
-        for i in range(9):
-            if board[i] == " ":
-                board[i] = "O"
-                score = self.minimax(board, 0, False)
-                board[i] = " "
-                if score > best_score:
-                    best_score = score
-                    best_move = i
+        dificultad = self.game.dificultad.lower()
+        if dificultad == "facil":
+            # 70% de probabilidades de hacer un movimiento aleatorio
+            if random.random() < 0.7:
+                available_moves = [i for i in range(9) if board[i] == " "]
+                best_move = random.choice(available_moves)
+            else:
+                best_score = -1000
+                for i in range(9):
+                    if board[i] == " ":
+                        board[i] = "O"
+                        score = self.minimax(board, 0, False)
+                        board[i] = " "
+                        if score > best_score:
+                            best_score = score
+                            best_move = i
+        elif dificultad == "medio":
+            # 50% de probabilidades de hacer un movimiento aleatorio
+            if random.random() < 0.5:
+                available_moves = [i for i in range(9) if board[i] == " "]
+                best_move = random.choice(available_moves)
+            else:
+                best_score = -1000
+                for i in range(9):
+                    if board[i] == " ":
+                        board[i] = "O"
+                        score = self.minimax(board, 0, False)
+                        board[i] = " "
+                        if score > best_score:
+                            best_score = score
+                            best_move = i
+        else:  # "dificil" o cualquier otro valor
+            best_score = -1000
+            for i in range(9):
+                if board[i] == " ":
+                    board[i] = "O"
+                    score = self.minimax(board, 0, False)
+                    board[i] = " "
+                    if score > best_score:
+                        best_score = score
+                        best_move = i
 
         if best_move is not None:
             self.game.tablero[best_move] = "O"
@@ -148,7 +198,6 @@ class TicTacToeView(View):
             await interaction.response.send_message("⚠️ No hay una partida en curso. Usa `/iniciar` para jugar.", ephemeral=True)
             return
 
-        # Verifica que el usuario que hace clic sea el jugador actual
         current_player = self.game.jugadores[self.game.jugador_actual]
         if interaction.user.mention != current_player:
             await interaction.response.send_message("⚠️ No es tu turno.", ephemeral=True)
@@ -165,30 +214,37 @@ class TicTacToeView(View):
         if await self.check_endgame(interaction):
             return
 
-        # Cambia de turno
         self.game.jugador_actual = "O" if self.game.jugador_actual == "X" else "X"
         await interaction.response.edit_message(view=self)
 
-        # Si se juega contra el bot y es turno de "O", el bot realiza su jugada
         if self.game.modo_vs_bot and self.game.jugador_actual == "O":
             await self.bot_move(interaction)
 
 @bot.tree.command(name="iniciar", description="Inicia una partida de Tres en Raya")
-async def iniciar(interaction: discord.Interaction, oponente: discord.Member = None):
-    game = TicTacToeGame()
-    game.partida_activa = True
+async def iniciar(interaction: discord.Interaction, oponente: discord.Member = None, dificultad: str = None):
+    if oponente is not None and oponente.id != bot.user.id and dificultad is not None:
+        await interaction.response.send_message("⚠️ El nivel de dificultad solo se puede ajustar al jugar contra el bot. Iniciando partida contra jugador.", ephemeral=True)
+        dificultad = None
 
-    # Si no se especifica oponente, se juega contra el bot
     if oponente is None or oponente.id == bot.user.id:
+        # Jugar contra el bot: se utiliza la dificultad especificada (por defecto "dificil")
+        dificultad = dificultad.lower() if dificultad else "dificil"
+        if dificultad not in ["facil", "medio", "dificil"]:
+            await interaction.response.send_message("⚠️ Dificultad inválida. Usa: facil, medio o dificil.", ephemeral=True)
+            return
+        game = TicTacToeGame(dificultad=dificultad)
         game.modo_vs_bot = True
         game.jugadores = {"X": interaction.user.mention, "O": bot.user.mention}
     else:
+        # Jugar contra otro jugador; se ignora la dificultad
+        game = TicTacToeGame()
         game.jugadores = {"X": interaction.user.mention, "O": oponente.mention}
 
+    game.partida_activa = True
     view = TicTacToeView(game, interaction.id)
     embed = discord.Embed(
         title="🎲 ¡Tres en raya!",
-        description=f"{game.jugadores['X']} contra {game.jugadores['O']} \n\n🎮 ¡QUE COMIENCE EL JUEGO! 🎮\n\n🔄 Turno de {game.jugadores[game.jugador_actual]} con {FICHAS['X']} !",
+        description=f"{game.jugadores['X']} contra {game.jugadores['O']}\n\n🎮 ¡QUE COMIENCE EL JUEGO! 🎮\n\n🔄 Turno de {game.jugadores[game.jugador_actual]} con {FICHAS['X']} !",
         color=discord.Color.blue()
     )
     await interaction.response.send_message(embed=embed, view=view)
@@ -201,6 +257,17 @@ async def reiniciar(interaction: discord.Interaction):
         await interaction.response.send_message("🔄 La partida ha sido reiniciada. Usa `/iniciar` para jugar de nuevo.")
     else:
         await interaction.response.send_message("⚠️ No hay ninguna partida activa para reiniciar.")
+
+@bot.tree.command(name="stats", description="Muestra las estadísticas de tus partidas")
+async def stats_command(interaction: discord.Interaction):
+    user = interaction.user.mention
+    user_stats = stats.get(user, {"wins": 0, "losses": 0, "draws": 0})
+    embed = discord.Embed(
+        title="📊 Tus estadísticas",
+        description=f"Wins: {user_stats['wins']}\nLosses: {user_stats['losses']}\nDraws: {user_stats['draws']}",
+        color=discord.Color.green()
+    )
+    await interaction.response.send_message(embed=embed)
 
 @bot.event
 async def on_ready():
