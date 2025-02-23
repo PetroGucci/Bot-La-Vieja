@@ -249,9 +249,10 @@ class TicTacToeView(View):
         if self.game.modo_vs_bot and self.game.jugador_actual == "O":
             await self.bot_move(interaction)
 
-@bot.tree.command(name="iniciar", description="Inicia una partida de Tres en Raya")
-@app_commands.describe(oponente="Selecciona un oponente para jugar")
-@app_commands.describe(dificultad="Selecciona la dificultad del juego")
+@bot.tree.command(name="iniciar", description="Utiliza solo /iniciar para jugar una partida contra el bot.")
+@app_commands.describe(oponente="Selecciona un oponente en este servidor para iniciar una partida.")
+@app_commands.describe(dificultad='Selecciona la dificultad para jugar contra el bot. Por defecto: "Medio".')
+
 @app_commands.choices(dificultad=[
     app_commands.Choice(name="Fácil", value="facil"),
     app_commands.Choice(name="Medio", value="medio"),
@@ -263,8 +264,8 @@ async def iniciar(interaction: discord.Interaction, oponente: discord.Member = N
         dificultad = None
 
     if oponente is None or oponente.id == bot.user.id:
-        # Jugar contra el bot: se utiliza la dificultad especificada (por defecto "dificil")
-        dificultad = dificultad.value if dificultad else "dificil"
+        # Jugar contra el bot: se utiliza la dificultad especificada (por defecto "medio")
+        dificultad = dificultad.value if dificultad else "medio"
         game = TicTacToeGame(dificultad=dificultad)
         game.modo_vs_bot = True
         game.jugadores = {"X": interaction.user.mention, "O": bot.user.mention}
