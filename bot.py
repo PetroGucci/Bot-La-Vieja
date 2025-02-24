@@ -296,7 +296,7 @@ async def reiniciar(interaction: discord.Interaction):
 
 @bot.tree.command(name="stats", description="Muestra las estadísticas de tus partidas")
 async def stats_command(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)  # Defer the response to give more time
+    await interaction.response.defer()  # Defer the response to give more time
     guild_id = interaction.guild.id
     user = interaction.user.mention
     user_stats = stats.get(guild_id, {}).get(user, {"wins": 0, "losses": 0, "draws": 0})
@@ -305,8 +305,7 @@ async def stats_command(interaction: discord.Interaction):
         description=f"Victorias: {user_stats['wins']}\nDerrotas: {user_stats['losses']}\nEmpates: {user_stats['draws']}",
         color=discord.Color.green()
     )
-    await interaction.followup.send(embed=embed, ephemeral=True)  # Use followup to send the actual message
-
+    await interaction.followup.send(embed=embed)  # Send the actual message without ephemeral
 @bot.event
 async def on_ready():
     load_partidas()
