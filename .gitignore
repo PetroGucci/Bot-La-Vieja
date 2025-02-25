@@ -2,6 +2,8 @@
 
 # Archivos
 .env
+stats.json
+partidas.json
 
 # Carpetas
 Bot/
