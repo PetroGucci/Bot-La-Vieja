@@ -163,10 +163,22 @@ class TicTacToeView(View):
         self.message_id = message_id
         # Crear 9 botones para las casillas
         for i in range(9):
-            button = Button(style=discord.ButtonStyle.secondary, label=FICHAS[self.game.tablero[i]], row=i // 3)
+            button = Button(
+                style=self.get_button_style(self.game.tablero[i]), 
+                label=FICHAS[self.game.tablero[i]], 
+                row=i // 3
+            )
             button.callback = partial(self.handle_click, index=i)
             self.add_item(button)
-    
+
+    def get_button_style(self, symbol):
+        if symbol == "X":
+            return discord.ButtonStyle.success  # Verde
+        elif symbol == "O":
+            return discord.ButtonStyle.danger  # Rojo
+        else:
+            return discord.ButtonStyle.secondary  # Gris
+
     async def disable_buttons(self, interaction: discord.Interaction):
         for child in self.children:
             child.disabled = True
@@ -284,6 +296,7 @@ class TicTacToeView(View):
         if best_move is not None:
             self.game.tablero[best_move] = "O"
             self.children[best_move].label = FICHAS["O"]
+            self.children[best_move].style = self.get_button_style("O")
             self.children[best_move].disabled = True
             if await self.check_endgame(interaction):
                 return
@@ -306,6 +319,7 @@ class TicTacToeView(View):
 
         self.game.tablero[index] = self.game.jugador_actual
         self.children[index].label = FICHAS[self.game.jugador_actual]
+        self.children[index].style = self.get_button_style(self.game.jugador_actual)
         self.children[index].disabled = True
 
         if await self.check_endgame(interaction):
