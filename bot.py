@@ -80,7 +80,7 @@ def load_partidas():
     global partidas
     cursor.execute("SELECT * FROM partidas")
     for row in cursor.fetchall():
-        game = TicTacToeGame(dificultad=row[8])
+        game = TicTacToeGame(guild_id=row[1], dificultad=row[8])
         game.tablero = list(row[3])
         game.jugador_actual = row[4]
         game.modo_vs_bot = row[5]
@@ -109,27 +109,35 @@ def load_stats():
 
 def update_stats(guild_id, winner, loser):
     """Actualiza las estadísticas tras una victoria."""
-    if guild_id not in stats:
-        stats[guild_id] = {}
-    for player in [winner, loser]:
-        if player not in stats[guild_id]:
-            stats[guild_id][player] = {"wins": 0, "losses": 0, "draws": 0}
-    stats[guild_id][winner]["wins"] += 1
-    stats[guild_id][loser]["losses"] += 1
-    save_stats()
+    cursor.execute("""
+        INSERT INTO stats (guild_id, user, wins, losses, draws)
+        VALUES (%s, %s, 1, 0, 0)
+        ON DUPLICATE KEY UPDATE wins = wins + 1
+    """, (guild_id, winner))
+    cursor.execute("""
+        INSERT INTO stats (guild_id, user, wins, losses, draws)
+        VALUES (%s, %s, 0, 1, 0)
+        ON DUPLICATE KEY UPDATE losses = losses + 1
+    """, (guild_id, loser))
+    db.commit()
 
 def update_draw(guild_id, player1, player2):
     """Actualiza las estadísticas en caso de empate."""
-    if guild_id not in stats:
-        stats[guild_id] = {}
-    for player in [player1, player2]:
-        if player not in stats[guild_id]:
-            stats[guild_id][player] = {"wins": 0, "losses": 0, "draws": 0}
-        stats[guild_id][player]["draws"] += 1
-    save_stats()
+    cursor.execute("""
+        INSERT INTO stats (guild_id, user, wins, losses, draws)
+        VALUES (%s, %s, 0, 0, 1)
+        ON DUPLICATE KEY UPDATE draws = draws + 1
+    """, (guild_id, player1))
+    cursor.execute("""
+        INSERT INTO stats (guild_id, user, wins, losses, draws)
+        VALUES (%s, %s, 0, 0, 1)
+        ON DUPLICATE KEY UPDATE draws = draws + 1
+    """, (guild_id, player2))
+    db.commit()
 
 class TicTacToeGame:
-    def __init__(self, dificultad="dificil"):
+    def __init__(self, guild_id, dificultad="dificil"):
+        self.guild_id = guild_id
         self.tablero = [" "] * 9
         self.jugador_actual = "X"
         self.modo_vs_bot = False
@@ -326,12 +334,12 @@ async def iniciar(interaction: discord.Interaction, oponente: discord.Member = N
     if oponente is None or oponente.id == bot.user.id:
         # Jugar contra el bot: se utiliza la dificultad especificada (por defecto "medio")
         dificultad = dificultad.value if dificultad else "medio"
-        game = TicTacToeGame(dificultad=dificultad)
+        game = TicTacToeGame(interaction.guild.id, dificultad=dificultad)
         game.modo_vs_bot = True
         game.jugadores = {"X": interaction.user.mention, "O": bot.user.mention}
     else:
         # Jugar contra otro jugador; se ignora la dificultad
-        game = TicTacToeGame()
+        game = TicTacToeGame(interaction.guild.id)
         game.jugadores = {"X": interaction.user.mention, "O": oponente.mention}
 
     game.partida_activa = True
@@ -359,13 +367,22 @@ async def stats_command(interaction: discord.Interaction):
     await interaction.response.defer()  # Defer the response to give more time
     guild_id = interaction.guild.id
     user = interaction.user.mention
-    user_stats = stats.get(guild_id, {}).get(user, {"wins": 0, "losses": 0, "draws": 0})
+
+    # Consultar la base de datos para obtener las estadísticas del usuario
+    cursor.execute("SELECT wins, losses, draws FROM stats WHERE guild_id = %s AND user = %s", (guild_id, user))
+    result = cursor.fetchone()
+    if result:
+        wins, losses, draws = result
+    else:
+        wins, losses, draws = 0, 0, 0
+
     embed = discord.Embed(
         title="📊 Tus estadísticas",
-        description=f"Victorias: {user_stats['wins']}\nDerrotas: {user_stats['losses']}\nEmpates: {user_stats['draws']}",
+        description=f"Victorias: {wins}\nDerrotas: {losses}\nEmpates: {draws}",
         color=discord.Color.green()
     )
     await interaction.followup.send(embed=embed)  # Send the actual message without ephemeral
+
 @bot.event
 async def on_ready():
     load_partidas()
