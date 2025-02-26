@@ -1,6 +1,6 @@
 # Bot-La-Vieja
 
-Bot-La-Vieja es un bot de Discord desarrollado en Python. Este bot está diseñado para proporcionar diversas funcionalidades y mejorar la experiencia de los usuarios en un servidor de Discord.
+Bot-La-Vieja es un bot de Discord desarrollado en Python. Este bot está diseñado para jugar el clásico de "Tic-Tac-Toe" con tus amigos y mejorar la experiencia de los usuarios en un servidor de Discord.
 
 ## Instalación
 
@@ -42,6 +42,7 @@ Una vez que el entorno virtual esté activado, instala las dependencias necesari
 ```bash
 pip install discord.py
 pip install python-dotenv
+pip install mysql-connector-python
 pip install -r requirements.txt
 ```
 
@@ -53,6 +54,7 @@ Después de instalar las dependencias, puedes ejecutar el bot con el siguiente c
 python bot.py
 ```
 
-Asegúrate de configurar correctamente el archivo `.env` con tus credenciales y tokens necesarios para que el bot funcione correctamente.
+Asegúrate de configurar correctamente el archivo `.env` con tus credenciales y tokens necesarios para que el bot funcione correctamente. 
+Si no tienes las credenciales, solicita al creador que te las proporcione.
 
 ¡Y eso es todo! Ahora deberías tener el bot funcionando en tu servidor de Discord.
