@@ -3,6 +3,7 @@ import random
 import os
 import webserver
 import json
+import mysql.connector
 from discord.ext import commands
 from discord import app_commands
 from discord.ui import View, Button
@@ -12,6 +13,10 @@ from functools import partial
 # Cargar variables de entorno
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
+MYSQL_HOST = os.getenv("MYSQL_HOST")
+MYSQL_USER = os.getenv("MYSQL_USER")
+MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD")
+MYSQL_DATABASE = os.getenv("MYSQL_DATABASE")
 
 # Configuración del bot
 intents = discord.Intents.default()
@@ -21,6 +26,41 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # Emojis para fichas
 FICHAS = {"X": "❎", "O": "🅾️", " ": "⬜"}
 
+# Conectar a la base de datos
+db = mysql.connector.connect(
+    host=MYSQL_HOST,
+    user=MYSQL_USER,
+    password=MYSQL_PASSWORD,
+    database=MYSQL_DATABASE
+)
+cursor = db.cursor()
+
+# Crear tablas si no existen
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS partidas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    guild_id BIGINT,
+    message_id BIGINT,
+    tablero VARCHAR(9),
+    jugador_actual CHAR(1),
+    modo_vs_bot BOOLEAN,
+    partida_activa BOOLEAN,
+    jugadores JSON,
+    dificultad VARCHAR(10)
+)
+""")
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS stats (
+    guild_id BIGINT,
+    user VARCHAR(255),
+    wins INT DEFAULT 0,
+    losses INT DEFAULT 0,
+    draws INT DEFAULT 0,
+    PRIMARY KEY (guild_id, user)
+)
+""")
+db.commit()
+
 # Almacenar partidas activas (clave: ID del mensaje)
 partidas = {}
 
@@ -28,24 +68,44 @@ partidas = {}
 stats = {}
 
 def save_partidas():
-    with open("partidas.json", "w") as f:
-        json.dump(partidas, f, default=lambda o: o.__dict__, indent=4)
+    cursor.execute("DELETE FROM partidas")
+    for message_id, game in partidas.items():
+        cursor.execute("""
+        INSERT INTO partidas (guild_id, message_id, tablero, jugador_actual, modo_vs_bot, partida_activa, jugadores, dificultad)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (game.guild_id, message_id, ''.join(game.tablero), game.jugador_actual, game.modo_vs_bot, game.partida_activa, json.dumps(game.jugadores), game.dificultad))
+    db.commit()
 
 def load_partidas():
     global partidas
-    if os.path.exists("partidas.json"):
-        with open("partidas.json", "r") as f:
-            partidas = json.load(f)
+    cursor.execute("SELECT * FROM partidas")
+    for row in cursor.fetchall():
+        game = TicTacToeGame(dificultad=row[8])
+        game.tablero = list(row[3])
+        game.jugador_actual = row[4]
+        game.modo_vs_bot = row[5]
+        game.partida_activa = row[6]
+        game.jugadores = json.loads(row[7])
+        partidas[row[2]] = game
 
 def save_stats():
-    with open("stats.json", "w") as f:
-        json.dump(stats, f, indent=4)
+    cursor.execute("DELETE FROM stats")
+    for guild_id, users in stats.items():
+        for user, user_stats in users.items():
+            cursor.execute("""
+            INSERT INTO stats (guild_id, user, wins, losses, draws)
+            VALUES (%s, %s, %s, %s, %s)
+            """, (guild_id, user, user_stats["wins"], user_stats["losses"], user_stats["draws"]))
+    db.commit()
 
 def load_stats():
     global stats
-    if os.path.exists("stats.json"):
-        with open("stats.json", "r") as f:
-            stats = json.load(f)
+    cursor.execute("SELECT * FROM stats")
+    for row in cursor.fetchall():
+        guild_id, user, wins, losses, draws = row
+        if guild_id not in stats:
+            stats[guild_id] = {}
+        stats[guild_id][user] = {"wins": wins, "losses": losses, "draws": draws}
 
 def update_stats(guild_id, winner, loser):
     """Actualiza las estadísticas tras una victoria."""
