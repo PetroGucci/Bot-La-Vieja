@@ -428,15 +428,6 @@ async def iniciar(interaction: discord.Interaction, oponente: discord.Member = N
     view = TokenSelectionView(interaction, oponente, dificultad_value)
     await interaction.response.send_message("Selecciona tu ficha:", view=view, ephemeral=True)
 
-@bot.tree.command(name="reiniciar", description="Reinicia la partida actual")
-async def reiniciar(interaction: discord.Interaction):
-    if interaction.id in partidas:
-        del partidas[interaction.id]
-        save_partidas()
-        await interaction.response.send_message("🔄 La partida ha sido reiniciada. Usa `/iniciar` para jugar de nuevo.")
-    else:
-        await interaction.response.send_message("⚠️ No hay ninguna partida activa para reiniciar.")
-
 @bot.tree.command(name="stats", description="Muestra las estadísticas de tus partidas")
 async def stats_command(interaction: discord.Interaction):
     await interaction.response.defer()  # Dar tiempo extra para procesar
