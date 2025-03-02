@@ -366,8 +366,10 @@ class TokenSelectionView(discord.ui.View):
         if interaction.user.id != self.original_interaction.user.id:
             await interaction.response.send_message("No puedes seleccionar esta opción.", ephemeral=True)
             return
-        # Usa un espacio cero para "vaciar" el mensaje sin dejarlo completamente vacío.
-        await interaction.response.edit_message(content='\u200b', view=None)
+        try:
+            await interaction.message.delete()
+        except discord.errors.NotFound:
+            pass
         await iniciar_partida(self.original_interaction, self.oponente, self.dificultad, "X")
 
     @discord.ui.button(label="O", style=discord.ButtonStyle.danger)
@@ -375,7 +377,10 @@ class TokenSelectionView(discord.ui.View):
         if interaction.user.id != self.original_interaction.user.id:
             await interaction.response.send_message("No puedes seleccionar esta opción.", ephemeral=True)
             return
-        await interaction.response.edit_message(content='\u200b', view=None)
+        try:
+            await interaction.message.delete()
+        except discord.errors.NotFound:
+            pass
         await iniciar_partida(self.original_interaction, self.oponente, self.dificultad, "O")
 
 # FUNCIÓN PARA INICIAR LA PARTIDA SEGÚN LA FICHA SELECCIONADA
@@ -426,7 +431,12 @@ async def iniciar(interaction: discord.Interaction, oponente: discord.Member = N
         dificultad_value = dificultad.value if dificultad else "medio"
     
     view = TokenSelectionView(interaction, oponente, dificultad_value)
-    await interaction.response.send_message("Selecciona tu ficha:", view=view, ephemeral=True)
+    embed = discord.Embed(
+        title="🎲 ¡Tres en raya!",
+        description="Selecciona tu ficha:",
+        color=discord.Color.blue()
+    )
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 @bot.tree.command(name="stats", description="Muestra las estadísticas de tus partidas")
 async def stats_command(interaction: discord.Interaction):
