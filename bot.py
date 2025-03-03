@@ -1,4 +1,4 @@
-import discord 
+import discord
 import random
 import os
 import webserver
@@ -73,7 +73,11 @@ def save_partidas():
         cursor.execute("""
         INSERT INTO partidas (guild_id, message_id, tablero, jugador_actual, modo_vs_bot, partida_activa, jugadores, dificultad)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """, (game.guild_id, message_id, ''.join(game.tablero), game.jugador_actual, game.modo_vs_bot, game.partida_activa, json.dumps(game.jugadores), game.dificultad))
+        """, (
+            game.guild_id, message_id, ''.join(game.tablero),
+            game.jugador_actual, game.modo_vs_bot, game.partida_activa,
+            json.dumps(game.jugadores), game.dificultad
+        ))
     db.commit()
 
 def load_partidas():
@@ -95,7 +99,10 @@ def save_stats():
             cursor.execute("""
             INSERT INTO stats (guild_id, user, wins, losses, draws)
             VALUES (%s, %s, %s, %s, %s)
-            """, (guild_id, user, user_stats["wins"], user_stats["losses"], user_stats["draws"]))
+            """, (
+                guild_id, user, user_stats["wins"],
+                user_stats["losses"], user_stats["draws"]
+            ))
     db.commit()
 
 def load_stats():
@@ -165,8 +172,8 @@ class TicTacToeView(View):
         # Crear 9 botones para las casillas
         for i in range(9):
             button = Button(
-                style=self.get_button_style(self.game.tablero[i]), 
-                label=FICHAS[self.game.tablero[i]], 
+                style=self.get_button_style(self.game.tablero[i]),
+                label=FICHAS[self.game.tablero[i]],
                 row=i // 3
             )
             button.callback = partial(self.handle_click, index=i)
@@ -174,11 +181,11 @@ class TicTacToeView(View):
 
     def get_button_style(self, symbol):
         if symbol == "X":
-            return discord.ButtonStyle.success  # Verde
+            return discord.ButtonStyle.success
         elif symbol == "O":
-            return discord.ButtonStyle.danger  # Rojo
+            return discord.ButtonStyle.danger
         else:
-            return discord.ButtonStyle.secondary  # Gris
+            return discord.ButtonStyle.secondary
 
     async def disable_buttons(self, interaction: discord.Interaction):
         for child in self.children:
@@ -194,7 +201,9 @@ class TicTacToeView(View):
             perdedor_marker = "X" if ganador_marker == "O" else "O"
             perdedor = self.game.jugadores[perdedor_marker]
             update_stats(interaction.guild.id, ganador, perdedor)
-            await interaction.message.reply(f"🏆 ¡{ganador} ha ganado con {FICHAS[ganador_marker]}!\n📊 Estadísticas actualizadas.")
+            await interaction.message.reply(
+                f"🏆 ¡{ganador} ha ganado con {FICHAS[ganador_marker]}!\n📊 Estadísticas actualizadas."
+            )
             if not interaction.response.is_done():
                 await interaction.response.defer()
             if self.message_id in partidas:
@@ -302,7 +311,7 @@ class TicTacToeView(View):
                         if score > best_score:
                             best_score = score
                             best_move = i
-        else:  # "dificil" u otro valor
+        else:
             best_score = -1000
             for i in range(9):
                 if board[i] == " ":
@@ -325,7 +334,10 @@ class TicTacToeView(View):
 
     async def handle_click(self, interaction: discord.Interaction, index: int):
         if not self.game.partida_activa:
-            await interaction.response.send_message("⚠️ No hay una partida en curso. Usa `/iniciar` para jugar.", ephemeral=True)
+            await interaction.response.send_message(
+                "⚠️ No hay una partida en curso. Usa `/iniciar` para jugar.",
+                ephemeral=True
+            )
             return
 
         current_player = self.game.jugadores[self.game.jugador_actual]
@@ -353,7 +365,7 @@ class TicTacToeView(View):
             self.game.jugador_actual = "O" if self.game.jugador_actual == "X" else "X"
             await interaction.response.edit_message(view=self)
 
-# NUEVA VISTA PARA LA SELECCIÓN DE FICHA
+# NUEVA VISTA PARA LA SELECCIÓN DE FICHA (con defer)
 class TokenSelectionView(discord.ui.View):
     def __init__(self, original_interaction: discord.Interaction, oponente: discord.Member, dificultad: str):
         super().__init__(timeout=60)
@@ -366,10 +378,9 @@ class TokenSelectionView(discord.ui.View):
         if interaction.user.id != self.original_interaction.user.id:
             await interaction.response.send_message("No puedes seleccionar esta opción.", ephemeral=True)
             return
-        try:
-            await interaction.message.delete()
-        except discord.errors.NotFound:
-            pass
+        # Responder inmediatamente para evitar "Error en esta interacción"
+        await interaction.response.defer()
+        await self.disable_buttons(interaction)
         await iniciar_partida(self.original_interaction, self.oponente, self.dificultad, "X")
 
     @discord.ui.button(label="O", style=discord.ButtonStyle.danger)
@@ -377,11 +388,17 @@ class TokenSelectionView(discord.ui.View):
         if interaction.user.id != self.original_interaction.user.id:
             await interaction.response.send_message("No puedes seleccionar esta opción.", ephemeral=True)
             return
+        await interaction.response.defer()
+        await self.disable_buttons(interaction)
+        await iniciar_partida(self.original_interaction, self.oponente, self.dificultad, "O")
+
+    async def disable_buttons(self, interaction: discord.Interaction):
+        for child in self.children:
+            child.disabled = True
         try:
-            await interaction.message.delete()
+            await interaction.message.edit(view=self)
         except discord.errors.NotFound:
             pass
-        await iniciar_partida(self.original_interaction, self.oponente, self.dificultad, "O")
 
 # FUNCIÓN PARA INICIAR LA PARTIDA SEGÚN LA FICHA SELECCIONADA
 async def iniciar_partida(interaction: discord.Interaction, oponente: discord.Member, dificultad: str, user_ficha: str):
@@ -401,23 +418,30 @@ async def iniciar_partida(interaction: discord.Interaction, oponente: discord.Me
         else:
             game.jugadores = {"X": bot.user.mention, "O": interaction.user.mention}
             game.bot_marker = "X"
+
     game.jugador_actual = user_ficha
     game.partida_activa = True
 
     view = TicTacToeView(game, interaction.id)
     embed = discord.Embed(
         title="🎲 ¡Tres en raya!",
-        description=f"{game.jugadores['X']} vs {game.jugadores['O']}\n\n🎮 ¡QUE COMIENCE EL JUEGO! 🎮\n\n🔄 Turno de {game.jugadores[game.jugador_actual]} con {FICHAS[game.jugador_actual]}!",
+        description=(
+            f"{game.jugadores['X']} vs {game.jugadores['O']}\n\n"
+            f"🎮 ¡QUE COMIENCE EL JUEGO! 🎮\n\n"
+            f"🔄 Turno de {game.jugadores[game.jugador_actual]} con {FICHAS[game.jugador_actual]}!"
+        ),
         color=discord.Color.blue()
     )
     await interaction.followup.send(embed=embed, view=view)
     partidas[interaction.id] = game
     save_partidas()
 
-# COMANDO /INICIAR MODIFICADO PARA USAR LA SELECCIÓN DE FICHA CON BOTONES
+# COMANDO /INICIAR
 @bot.tree.command(name="iniciar", description="Inicia una partida de Tres en Raya. Selecciona tu ficha con botones.")
-@app_commands.describe(oponente="Selecciona un oponente en este servidor para iniciar una partida.",
-                       dificultad='Selecciona la dificultad para jugar contra el bot. Por defecto: "Medio".')
+@app_commands.describe(
+    oponente="Selecciona un oponente en este servidor para iniciar una partida.",
+    dificultad='Selecciona la dificultad para jugar contra el bot. Por defecto: "Medio".'
+)
 @app_commands.choices(dificultad=[
     app_commands.Choice(name="Fácil", value="facil"),
     app_commands.Choice(name="Medio", value="medio"),
@@ -425,7 +449,10 @@ async def iniciar_partida(interaction: discord.Interaction, oponente: discord.Me
 ])
 async def iniciar(interaction: discord.Interaction, oponente: discord.Member = None, dificultad: app_commands.Choice[str] = None):
     if oponente is not None and oponente.id != bot.user.id and dificultad is not None:
-        await interaction.response.send_message("⚠️ El nivel de dificultad solo se puede ajustar al jugar contra el bot. Iniciando partida contra jugador.", ephemeral=True)
+        await interaction.response.send_message(
+            "⚠️ El nivel de dificultad solo se puede ajustar al jugar contra el bot. Iniciando partida contra jugador.",
+            ephemeral=True
+        )
         dificultad_value = None
     else:
         dificultad_value = dificultad.value if dificultad else "medio"
@@ -440,7 +467,7 @@ async def iniciar(interaction: discord.Interaction, oponente: discord.Member = N
 
 @bot.tree.command(name="stats", description="Muestra las estadísticas de tus partidas")
 async def stats_command(interaction: discord.Interaction):
-    await interaction.response.defer()  # Dar tiempo extra para procesar
+    await interaction.response.defer()
     guild_id = interaction.guild.id
     user = interaction.user.mention
 
