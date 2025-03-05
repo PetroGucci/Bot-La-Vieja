@@ -365,7 +365,7 @@ class TicTacToeView(View):
             self.game.jugador_actual = "O" if self.game.jugador_actual == "X" else "X"
             await interaction.response.edit_message(view=self)
 
-# NUEVA VISTA PARA LA SELECCIÓN DE FICHA (con defer)
+# NUEVA VISTA PARA LA SELECCIÓN DE FICHA (ajustada a tu petición)
 class TokenSelectionView(discord.ui.View):
     def __init__(self, original_interaction: discord.Interaction, oponente: discord.Member, dificultad: str):
         super().__init__(timeout=60)
@@ -373,32 +373,54 @@ class TokenSelectionView(discord.ui.View):
         self.oponente = oponente
         self.dificultad = dificultad
 
-    @discord.ui.button(label="X", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="❎", style=discord.ButtonStyle.success)
     async def select_x(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.original_interaction.user.id:
             await interaction.response.send_message("No puedes seleccionar esta opción.", ephemeral=True)
             return
-        # Responder inmediatamente para evitar "Error en esta interacción"
-        await interaction.response.defer()
-        await self.disable_buttons(interaction)
-        await iniciar_partida(self.original_interaction, self.oponente, self.dificultad, "X")
+        # Defer para ganar tiempo y poder editar la respuesta original
+        await interaction.response.defer(ephemeral=True)
 
-    @discord.ui.button(label="O", style=discord.ButtonStyle.danger)
+        # Deshabilitar ambos botones.
+        # - Mantenemos el color del botón pulsado
+        # - El otro botón lo ponemos en gris
+        for child in self.children:
+            child.disabled = True
+            if child != button:
+                child.style = discord.ButtonStyle.secondary
+
+        try:
+            await interaction.edit_original_response(view=self)
+        except Exception as e:
+            print("Error al editar el mensaje:", e)
+
+        # Iniciar la partida con "X"
+        await iniciar_partida(self.original_interaction, self.oponente, self.dificultad, "X")
+        self.stop()
+
+    @discord.ui.button(label="🅾️", style=discord.ButtonStyle.danger)
     async def select_o(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.original_interaction.user.id:
             await interaction.response.send_message("No puedes seleccionar esta opción.", ephemeral=True)
             return
-        await interaction.response.defer()
-        await self.disable_buttons(interaction)
-        await iniciar_partida(self.original_interaction, self.oponente, self.dificultad, "O")
+        await interaction.response.defer(ephemeral=True)
 
-    async def disable_buttons(self, interaction: discord.Interaction):
+        # Deshabilitar ambos botones.
+        # - Mantenemos el color del botón pulsado
+        # - El otro botón lo ponemos en gris
         for child in self.children:
             child.disabled = True
+            if child != button:
+                child.style = discord.ButtonStyle.secondary
+
         try:
-            await interaction.message.edit(view=self)
-        except discord.errors.NotFound:
-            pass
+            await interaction.edit_original_response(view=self)
+        except Exception as e:
+            print("Error al editar el mensaje:", e)
+
+        # Iniciar la partida con "O"
+        await iniciar_partida(self.original_interaction, self.oponente, self.dificultad, "O")
+        self.stop()
 
 # FUNCIÓN PARA INICIAR LA PARTIDA SEGÚN LA FICHA SELECCIONADA
 async def iniciar_partida(interaction: discord.Interaction, oponente: discord.Member, dificultad: str, user_ficha: str):
