@@ -169,6 +169,7 @@ class TicTacToeView(View):
         super().__init__(timeout=300)
         self.game = game
         self.message_id = message_id
+        self.message = None  # Atributo para almacenar el mensaje asociado a la vista
         # Crear 9 botones para las casillas
         for i in range(9):
             button = Button(
@@ -330,7 +331,7 @@ class TicTacToeView(View):
             if await self.check_endgame(interaction):
                 return
         self.game.jugador_actual = human_marker
-        await interaction.message.edit(view=self)
+        await self.message.edit(view=self)
 
     async def handle_click(self, interaction: discord.Interaction, index: int):
         if not self.game.partida_activa:
@@ -418,12 +419,12 @@ class TokenSelectionView(discord.ui.View):
         except Exception as e:
             print("Error al editar el mensaje:", e)
 
-        # Iniciar la partida con "O"
-        await iniciar_partida(self.original_interaction, self.oponente, self.dificultad, "O")
+        # Iniciar la partida con "O" y permitir que el bot haga el primer movimiento
+        await iniciar_partida(self.original_interaction, self.oponente, self.dificultad, "O", bot_first=True)
         self.stop()
 
 # FUNCIÓN PARA INICIAR LA PARTIDA SEGÚN LA FICHA SELECCIONADA
-async def iniciar_partida(interaction: discord.Interaction, oponente: discord.Member, dificultad: str, user_ficha: str):
+async def iniciar_partida(interaction: discord.Interaction, oponente: discord.Member, dificultad: str, user_ficha: str, bot_first: bool = False):
     if oponente is not None and oponente.id != bot.user.id:
         game = TicTacToeGame(interaction.guild.id)
         if user_ficha == "X":
@@ -454,9 +455,17 @@ async def iniciar_partida(interaction: discord.Interaction, oponente: discord.Me
         ),
         color=discord.Color.blue()
     )
-    await interaction.followup.send(embed=embed, view=view)
+    # Enviar el mensaje inicial del juego
+    message = await interaction.followup.send(embed=embed, view=view)
     partidas[interaction.id] = game
     save_partidas()
+
+    # Asignar el mensaje a la vista
+    view.message = message
+
+    # Si el bot debe comenzar, realizar su movimiento inicial
+    if bot_first and game.modo_vs_bot:
+        await view.bot_move(interaction)
 
 # COMANDO /INICIAR
 @bot.tree.command(name="iniciar", description="Inicia una partida de Tres en Raya. Selecciona tu ficha con botones.")
