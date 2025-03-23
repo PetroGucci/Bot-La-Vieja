@@ -4,6 +4,7 @@ import os
 import webserver
 import json
 import mysql.connector
+import asyncio  # Asegúrate de importar asyncio al inicio del archivo
 from discord.ext import commands
 from discord import app_commands
 from discord.ui import View, Button
@@ -323,6 +324,20 @@ class TicTacToeView(View):
                         best_score = score
                         best_move = i
 
+        # Actualizar el embed para mostrar el turno del bot antes de que juegue
+        embed = discord.Embed(
+            title="🎲 ¡Tres en raya!",
+            description=(
+                f"{self.game.jugadores['X']} vs {self.game.jugadores['O']}\n\n"
+                f"🔄 Turno de {self.game.jugadores[bot_marker]} con {FICHAS[bot_marker]}!"
+            ),
+            color=discord.Color.blue()
+        )
+        await self.message.edit(embed=embed, view=self)
+
+        # Agregar un pequeño retraso para que el usuario vea el turno del bot
+        await asyncio.sleep(0.3)  # Retraso de 0.3 secleagundos
+
         if best_move is not None:
             self.game.tablero[best_move] = bot_marker
             self.children[best_move].label = FICHAS[bot_marker]
@@ -331,7 +346,17 @@ class TicTacToeView(View):
             if await self.check_endgame(interaction):
                 return
         self.game.jugador_actual = human_marker
-        await self.message.edit(view=self)
+
+        # Actualizar el embed dinámicamente para mostrar el turno del jugador humano
+        embed = discord.Embed(
+            title="🎲 ¡Tres en raya!",
+            description=(
+                f"{self.game.jugadores['X']} vs {self.game.jugadores['O']}\n\n"
+                f"🔄 Turno de {self.game.jugadores[self.game.jugador_actual]} con {FICHAS[self.game.jugador_actual]}!"
+            ),
+            color=discord.Color.blue()
+        )
+        await self.message.edit(embed=embed, view=self)
 
     async def handle_click(self, interaction: discord.Interaction, index: int):
         if not self.game.partida_activa:
