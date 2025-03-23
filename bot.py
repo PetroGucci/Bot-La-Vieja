@@ -245,7 +245,9 @@ class TicTacToeView(View):
                     return -10
         return 0
 
-    def minimax(self, board, depth, is_maximizing):
+    def minimax(self, board, depth, is_maximizing, max_depth=3):
+        if depth >= max_depth:
+            return 0  # Detener la recursión en la profundidad máxima
         if self.game.modo_vs_bot and self.game.bot_marker:
             bot_marker = self.game.bot_marker
             human_marker = "X" if bot_marker == "O" else "O"
@@ -275,7 +277,7 @@ class TicTacToeView(View):
                     board[i] = " "
             return best
 
-    async def bot_move(self, interaction: discord.Interaction):
+    async def bot_move(self, interaction: discord.Interaction, first_turn=False):
         if self.game.modo_vs_bot and self.game.bot_marker:
             bot_marker = self.game.bot_marker
             human_marker = "X" if bot_marker == "O" else "O"
@@ -324,6 +326,12 @@ class TicTacToeView(View):
                         best_score = score
                         best_move = i
 
+        if board == [" "] * 9:  # Tablero vacío
+            best_move = 4 if board[4] == " " else random.choice([0, 2, 6, 8])  # Priorizar el centro o esquinas
+        else:
+            # Ejecutar el cálculo normal
+            pass  # Esto evita el error si no hay lógica implementada aún
+
         # Actualizar el embed para mostrar el turno del bot antes de que juegue
         embed = discord.Embed(
             title="🎲 ¡Tres en raya!",
@@ -335,8 +343,9 @@ class TicTacToeView(View):
         )
         await self.message.edit(embed=embed, view=self)
 
-        # Agregar un pequeño retraso para que el usuario vea el turno del bot
-        await asyncio.sleep(0.3)  # Retraso de 0.3 secleagundos
+        # Agregar un retraso solo si no es el primer turno
+        if not first_turn:
+            await asyncio.sleep(0.3)
 
         if best_move is not None:
             self.game.tablero[best_move] = bot_marker
@@ -506,7 +515,7 @@ async def iniciar_partida(interaction: discord.Interaction, oponente: discord.Me
 
     # Si el bot debe comenzar, realizar su movimiento inicial
     if bot_first and game.modo_vs_bot:
-        await view.bot_move(interaction)
+        await view.bot_move(interaction, first_turn=True)
 
 # COMANDO /INICIAR
 @bot.tree.command(name="iniciar", description="Inicia una partida de Tres en Raya. Selecciona tu ficha con botones.")
