@@ -487,11 +487,15 @@ async def iniciar(interaction: discord.Interaction, oponente: discord.Member = N
     )
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-@bot.tree.command(name="stats", description="Muestra las estadísticas de tus partidas")
-async def stats_command(interaction: discord.Interaction):
+@bot.tree.command(name="stats", description="Muestra las estadísticas de tus partidas o las de otro usuario")
+@app_commands.describe(usuario="Menciona a un usuario para ver sus estadísticas")
+async def stats_command(interaction: discord.Interaction, usuario: discord.Member = None):
     await interaction.response.defer()
     guild_id = interaction.guild.id
-    user = interaction.user.mention
+    user = usuario.mention if usuario else interaction.user.mention
+
+    # Obtener el nombre o apodo del usuario
+    user_display_name = usuario.display_name if usuario else interaction.user.display_name
 
     cursor.execute("SELECT wins, losses, draws FROM stats WHERE guild_id = %s AND user = %s", (guild_id, user))
     result = cursor.fetchone()
@@ -501,7 +505,7 @@ async def stats_command(interaction: discord.Interaction):
         wins, losses, draws = 0, 0, 0
 
     embed = discord.Embed(
-        title="📊 Tus estadísticas",
+        title=f"📊 Estadísticas de {user_display_name}",
         description=f"Victorias: {wins}\nDerrotas: {losses}\nEmpates: {draws}",
         color=discord.Color.green()
     )
