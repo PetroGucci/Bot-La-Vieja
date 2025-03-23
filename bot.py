@@ -350,23 +350,36 @@ class TicTacToeView(View):
             await interaction.response.send_message("❌ Esa casilla ya está ocupada.", ephemeral=True)
             return
 
+        # Actualizar el tablero y el botón correspondiente
         self.game.tablero[index] = self.game.jugador_actual
         self.children[index].label = FICHAS[self.game.jugador_actual]
         self.children[index].style = self.get_button_style(self.game.jugador_actual)
         self.children[index].disabled = True
 
+        # Verificar si el juego ha terminado
         if await self.check_endgame(interaction):
             return
 
+        # Cambiar el turno al siguiente jugador
         if self.game.modo_vs_bot:
             self.game.jugador_actual = self.game.bot_marker
             await interaction.response.edit_message(view=self)
             await self.bot_move(interaction)
         else:
             self.game.jugador_actual = "O" if self.game.jugador_actual == "X" else "X"
-            await interaction.response.edit_message(view=self)
 
-# NUEVA VISTA PARA LA SELECCIÓN DE FICHA (ajustada a tu petición)
+            # Actualizar el embed dinámicamente
+            embed = discord.Embed(
+                title="🎲 ¡Tres en raya!",
+                description=(
+                    f"{self.game.jugadores['X']} vs {self.game.jugadores['O']}\n\n"
+                    f"🔄 Turno de {self.game.jugadores[self.game.jugador_actual]} con {FICHAS[self.game.jugador_actual]}!"
+                ),
+                color=discord.Color.blue()
+            )
+            await interaction.response.edit_message(embed=embed, view=self)
+
+# NUEVA VISTA PARA LA SELECCIÓN DE FICHA 
 class TokenSelectionView(discord.ui.View):
     def __init__(self, original_interaction: discord.Interaction, oponente: discord.Member, dificultad: str):
         super().__init__(timeout=60)
