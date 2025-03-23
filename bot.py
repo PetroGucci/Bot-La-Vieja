@@ -426,12 +426,14 @@ class TokenSelectionView(discord.ui.View):
 # FUNCIÓN PARA INICIAR LA PARTIDA SEGÚN LA FICHA SELECCIONADA
 async def iniciar_partida(interaction: discord.Interaction, oponente: discord.Member, dificultad: str, user_ficha: str, bot_first: bool = False):
     if oponente is not None and oponente.id != bot.user.id:
+        # Configuración para partida contra otro usuario
         game = TicTacToeGame(interaction.guild.id)
         if user_ficha == "X":
             game.jugadores = {"X": interaction.user.mention, "O": oponente.mention}
         else:
             game.jugadores = {"X": oponente.mention, "O": interaction.user.mention}
     else:
+        # Configuración para partida contra el bot
         dificultad = dificultad if dificultad else "medio"
         game = TicTacToeGame(interaction.guild.id, dificultad=dificultad)
         game.modo_vs_bot = True
@@ -442,7 +444,8 @@ async def iniciar_partida(interaction: discord.Interaction, oponente: discord.Me
             game.jugadores = {"X": bot.user.mention, "O": interaction.user.mention}
             game.bot_marker = "X"
 
-    game.jugador_actual = user_ficha
+    # El jugador con la ficha "X" siempre comienza
+    game.jugador_actual = "X"
     game.partida_activa = True
 
     view = TicTacToeView(game, interaction.id)
