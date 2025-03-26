@@ -577,5 +577,9 @@ async def on_ready():
     await bot.tree.sync()
     print(f"Bot conectado como {bot.user}")
 
+        # Estado del bot
+    activity = discord.Game(name="La Vieja ❎🅾️")
+    await bot.change_presence(activity=activity)
+
 webserver.keep_alive()
 bot.run(TOKEN)
