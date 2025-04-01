@@ -608,12 +608,13 @@ async def leaderboard(interaction: discord.Interaction):
             member = None
 
         user_display_name = member.display_name if member else f"Usuario desconocido ({user_id})"
-        leaderboard_text += f"**#{position}** {user_display_name} - {wins} Pts.\n"
+        # leaderboard_text += f"**#{position}** {user_display_name} - {wins} Pts.\n"
+        leaderboard_text += f"**#{position}** - {wins} Pts. {user_display_name}\n"
         position += 1
 
     embed = discord.Embed(
-        title="🏆 Tabla de posiciones",
-        description="Top jugadores con más victorias:\n\n" + leaderboard_text,
+        title="🏆 Tabla de posiciones:",
+        description= leaderboard_text,
         color=discord.Color.gold()
     )
     await interaction.followup.send(embed=embed)
