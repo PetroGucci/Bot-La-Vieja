@@ -570,6 +570,54 @@ async def stats_command(interaction: discord.Interaction, usuario: discord.Membe
     )
     await interaction.followup.send(embed=embed)
 
+@bot.tree.command(name="leaderboard", description="Muestra el top de jugadores con más victorias.")
+async def leaderboard(interaction: discord.Interaction):
+    await interaction.response.defer()
+    guild_id = interaction.guild.id
+
+    # Consultar el top 100 de jugadores con más victorias
+    cursor.execute("""
+        SELECT user, wins FROM stats
+        WHERE guild_id = %s
+        ORDER BY wins DESC
+        LIMIT 100
+    """, (guild_id,))
+    results = cursor.fetchall()
+
+    if not results:
+        await interaction.followup.send("⚠️ No hay datos disponibles para mostrar la tabla de posiciones.")
+        return
+
+    leaderboard_text = ""
+    excluded_user_id = 1334910035054297131  # ID del usuario "La Vieja" que debe ser excluido
+    position = 1
+
+    for user_mention, wins in results:
+        try:
+            user_id = int(user_mention.strip("<@!>"))
+        except Exception:
+            continue
+
+        # Excluir al usuario "La Vieja"
+        if user_id == excluded_user_id:
+            continue
+
+        try:
+            member = await interaction.guild.fetch_member(user_id)
+        except Exception:
+            member = None
+
+        user_display_name = member.display_name if member else f"Usuario desconocido ({user_id})"
+        leaderboard_text += f"**#{position}** {user_display_name} - {wins} Pts.\n"
+        position += 1
+
+    embed = discord.Embed(
+        title="🏆 Tabla de posiciones",
+        description="Top jugadores con más victorias:\n\n" + leaderboard_text,
+        color=discord.Color.gold()
+    )
+    await interaction.followup.send(embed=embed)
+
 @bot.event
 async def on_ready():
     load_partidas()
