@@ -551,24 +551,29 @@ async def iniciar(interaction: discord.Interaction, oponente: discord.Member = N
 async def stats_command(interaction: discord.Interaction, usuario: discord.Member = None):
     await interaction.response.defer()
     guild_id = interaction.guild.id
-    user = usuario.mention if usuario else interaction.user.mention
 
-    # Obtener el nombre o apodo del usuario
-    user_display_name = usuario.display_name if usuario else interaction.user.display_name
+    # Si no se menciona a nadie, usamos al autor del comando
+    member = usuario or interaction.user
 
-    cursor.execute("SELECT wins, losses, draws FROM stats WHERE guild_id = %s AND user = %s", (guild_id, user))
+    # Construimos la mención en formato <@ID>
+    user_mention = f"<@{member.id}>"
+
+    # Buscamos las estadísticas usando esa mención
+    cursor.execute("SELECT wins, losses, draws FROM stats WHERE guild_id = %s AND user = %s", (guild_id, user_mention))
     result = cursor.fetchone()
+
     if result:
         wins, losses, draws = result
     else:
         wins, losses, draws = 0, 0, 0
 
     embed = discord.Embed(
-        title=f"📊 Estadísticas de {user_display_name}",
-        description=f"Victorias: {wins}\nDerrotas: {losses}\nEmpates: {draws}",
+        title=f"📊 Estadísticas",
+        description=f"{user_mention}**:**\nVictorias: {wins}\nDerrotas: {losses}\nEmpates: {draws}",
         color=discord.Color.green()
     )
-    await interaction.followup.send(embed=embed)
+    # Si deseas que todos vean el resultado, pon ephemeral=False
+    await interaction.followup.send(embed=embed, ephemeral=False)
 
 @bot.tree.command(name="leaderboard", description="Muestra el top de jugadores con más victorias.")
 async def leaderboard(interaction: discord.Interaction):
@@ -602,22 +607,33 @@ async def leaderboard(interaction: discord.Interaction):
         if user_id == excluded_user_id:
             continue
 
-        try:
-            member = await interaction.guild.fetch_member(user_id)
-        except Exception:
-            member = None
-
-        user_display_name = member.display_name if member else f"Usuario desconocido ({user_id})"
-        # leaderboard_text += f"**#{position}** {user_display_name} - {wins} Pts.\n"
-        leaderboard_text += f"**#{position}** - {wins} Pts. {user_display_name}\n"
+        # Mencionamos al usuario correctamente en el ranking
+        leaderboard_text += f"**#{position}** - {wins} Pts. <@{user_id}>\n"
         position += 1
 
     embed = discord.Embed(
         title="🏆 Tabla de posiciones:",
-        description= leaderboard_text,
+        description=leaderboard_text,
         color=discord.Color.gold()
     )
     await interaction.followup.send(embed=embed)
+
+@bot.tree.command(name="help", description="Muestra información sobre los comandos del bot.")
+async def help_command(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="🤖 Ayuda del Bot",
+        description=(
+            "`/iniciar` - Inicia una partida de Tres en Raya.\n"
+            "`/iniciar @usuario` - Inicia una partida contra otro usuario.\n"
+            "`/iniciar dificultad` - Inicia una partida contra el bot con la dificultad especificada.\n"
+            "`/stats` - Muestra tus estadísticas.\n"
+            "`/stats @usuario` - Muestra las estadísticas de otro usuario.\n"
+            "`/leaderboard` - Tabla de posiciones.\n"
+            "`/help` - Este mensaje de ayuda."
+        ),
+        color=discord.Color.blue()
+    )
+    await interaction.response.send_message(embed=embed)
 
 @bot.event
 async def on_ready():
