@@ -518,32 +518,47 @@ async def iniciar_partida(interaction: discord.Interaction, oponente: discord.Me
         await view.bot_move(interaction, first_turn=True)
 
 # COMANDO /INICIAR
-@bot.tree.command(name="iniciar", description="Inicia una partida de Tres en Raya. Selecciona tu ficha con botones.")
+@bot.tree.command(name="iniciar", description="Inicia una partida de Tres en Raya.")
 @app_commands.describe(
-    oponente="Selecciona un oponente en este servidor para iniciar una partida.",
-    dificultad='Selecciona la dificultad para jugar contra el bot. Por defecto: "Medio".'
+    oponente="Menciona un oponente para jugar contra él, o déjalo vacío para jugar contra el bot.",
+    dificultad="Selecciona la dificultad (solo disponible contra el bot)."
 )
-@app_commands.choices(dificultad=[
-    app_commands.Choice(name="Fácil", value="facil"),
-    app_commands.Choice(name="Medio", value="medio"),
-    app_commands.Choice(name="Difícil", value="dificil")
-])
-async def iniciar(interaction: discord.Interaction, oponente: discord.Member = None, dificultad: app_commands.Choice[str] = None):
-    if oponente is not None and oponente.id != bot.user.id and dificultad is not None:
-        await interaction.response.send_message(
-            "⚠️ El nivel de dificultad solo se puede ajustar al jugar contra el bot. Iniciando partida contra jugador.",
-            ephemeral=True
-        )
+@app_commands.choices(
+    dificultad=[
+        app_commands.Choice(name="Fácil", value="facil"),
+        app_commands.Choice(name="Medio", value="medio"),
+        app_commands.Choice(name="Difícil", value="dificil")
+    ]
+)
+async def iniciar(
+    interaction: discord.Interaction, 
+    oponente: discord.Member = None, 
+    dificultad: app_commands.Choice[str] = None
+):
+    # 1. Comprobamos si el oponente es distinto del bot.
+    if oponente is not None and oponente.id != bot.user.id:
+        # Si alguien eligió dificultad también, lo anulamos y avisamos.
+        if dificultad is not None:
+            await interaction.response.send_message(
+                "⚠️ El nivel de dificultad no se puede establecer al jugar contra otro usuario.\n"
+                "Ignorando la dificultad y comenzando partida entre jugadores...",
+                ephemeral=True
+            )
+        # Forzamos dificultad a None porque no aplica vs. humano
         dificultad_value = None
     else:
+        # 2. Si no se especifica oponente (o es el bot), tomamos la dificultad elegida.
         dificultad_value = dificultad.value if dificultad else "medio"
-    
+
+    # 3. Construimos la vista y el embed para el juego
     view = TokenSelectionView(interaction, oponente, dificultad_value)
     embed = discord.Embed(
         title="🎲 ¡Tres en raya!",
         description="Selecciona tu ficha:",
         color=discord.Color.blue()
     )
+
+    # 4. Enviamos el mensaje con la vista y el embed
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 @bot.tree.command(name="stats", description="Muestra las estadísticas de tus partidas o las de otro usuario")
