@@ -634,8 +634,8 @@ async def help_command(interaction: discord.Interaction):
         title="🤖 Ayuda del Bot",
         description=(
             "`/start` - Inicia una partida de Tres en Raya.\n"
-            "`/start |dificultad|` - Define la dificultad contra el bot.\n"
             "`/start |oponente|` - Inicia una partida contra otro usuario.\n"
+            "`/start |dificultad|` - Define la dificultad contra el bot.\n"
             "\n`/stats` - Muestra tus estadísticas.\n"
             "`/stats |usuario|` - Muestra las estadísticas de otro usuario.\n"
             "`/leaderboard` - Tabla de posiciones.\n"
