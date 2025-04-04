@@ -647,9 +647,9 @@ async def leaderboard(interaction: discord.Interaction):
     await interaction.response.defer()
     guild_id = interaction.guild.id
     cursor.execute("""
-        SELECT user, wins FROM stats
+        SELECT user, wins, losses FROM stats
         WHERE guild_id = %s
-        ORDER BY wins DESC
+        ORDER BY wins DESC, losses ASC
         LIMIT 100
     """, (guild_id,))
     results = cursor.fetchall()
@@ -659,15 +659,19 @@ async def leaderboard(interaction: discord.Interaction):
     leaderboard_text = ""
     excluded_user_id = 1334910035054297131  # ID del usuario "La Vieja" a excluir
     position = 1
-    for user_mention, wins in results:
+    previous_wins, previous_losses = None, None
+    for user_mention, wins, losses in results:
         try:
             user_id = int(user_mention.strip("<@!>"))
         except Exception:
             continue
         if user_id == excluded_user_id:
             continue
+        # Ajustar posición solo si el puntaje cambia
+        if (wins, losses) != (previous_wins, previous_losses):
+            position = len(leaderboard_text.split("\n")) + 1
         leaderboard_text += f"**#{position}** - {wins} Pts. <@{user_id}>\n"
-        position += 1
+        previous_wins, previous_losses = wins, losses
     embed = discord.Embed(
         title="🏆 Tabla de posiciones:",
         description=leaderboard_text,
