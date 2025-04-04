@@ -170,7 +170,7 @@ class TicTacToeView(View):
         super().__init__(timeout=300)
         self.game = game
         self.message_id = message_id
-        self.message = None  # Atributo para almacenar el mensaje asociado a la vista
+        self.message = None  # Almacena el mensaje asociado a la vista
         # Crear 9 botones para las casillas
         for i in range(9):
             button = Button(
@@ -194,6 +194,18 @@ class TicTacToeView(View):
             child.disabled = True
         await interaction.message.edit(view=self)
 
+    async def send_game_end(self, interaction: discord.Interaction):
+        """Envía el mensaje final común para victoria o empate."""
+        embed_end = discord.Embed(
+            title="Juego terminado",
+            description="Selecciona una opción:",
+            color=discord.Color.purple()
+        )
+        await interaction.channel.send(embed=embed_end, view=GameEndView(self.game, interaction.channel))
+        if self.message_id in partidas:
+            del partidas[self.message_id]
+            save_partidas()
+
     async def check_endgame(self, interaction: discord.Interaction):
         if self.game.verificar_ganador():
             self.game.partida_activa = False
@@ -206,22 +218,18 @@ class TicTacToeView(View):
             await interaction.message.reply(
                 f"🏆 ¡{ganador} ha ganado con {FICHAS[ganador_marker]}!\n📊 Estadísticas actualizadas."
             )
+            await self.send_game_end(interaction)
             if not interaction.response.is_done():
                 await interaction.response.defer()
-            if self.message_id in partidas:
-                del partidas[self.message_id]
-                save_partidas()
             return True
         elif " " not in self.game.tablero:
             self.game.partida_activa = False
             await self.disable_buttons(interaction)
             update_draw(interaction.guild.id, self.game.jugadores["X"], self.game.jugadores["O"])
             await interaction.message.reply("😲 ¡Empate!\n📊 Estadísticas actualizadas.")
+            await self.send_game_end(interaction)
             if not interaction.response.is_done():
                 await interaction.response.defer()
-            if self.message_id in partidas:
-                del partidas[self.message_id]
-                save_partidas()
             return True
         return False
 
@@ -326,13 +334,11 @@ class TicTacToeView(View):
                         best_score = score
                         best_move = i
 
-        if board == [" "] * 9:  # Tablero vacío
-            best_move = 4 if board[4] == " " else random.choice([0, 2, 6, 8])  # Priorizar el centro o esquinas
+        if board == [" "] * 9:
+            best_move = 4 if board[4] == " " else random.choice([0, 2, 6, 8])
         else:
-            # Ejecutar el cálculo normal
-            pass  # Esto evita el error si no hay lógica implementada aún
+            pass
 
-        # Actualizar el embed para mostrar el turno del bot antes de que juegue
         embed = discord.Embed(
             title="🎲 ¡Tres en raya!",
             description=(
@@ -343,7 +349,6 @@ class TicTacToeView(View):
         )
         await self.message.edit(embed=embed, view=self)
 
-        # Agregar un retraso solo si no es el primer turno
         if not first_turn:
             await asyncio.sleep(0.3)
 
@@ -356,7 +361,6 @@ class TicTacToeView(View):
                 return
         self.game.jugador_actual = human_marker
 
-        # Actualizar el embed dinámicamente para mostrar el turno del jugador humano
         embed = discord.Embed(
             title="🎲 ¡Tres en raya!",
             description=(
@@ -384,25 +388,20 @@ class TicTacToeView(View):
             await interaction.response.send_message("❌ Esa casilla ya está ocupada.", ephemeral=True)
             return
 
-        # Actualizar el tablero y el botón correspondiente
         self.game.tablero[index] = self.game.jugador_actual
         self.children[index].label = FICHAS[self.game.jugador_actual]
         self.children[index].style = self.get_button_style(self.game.jugador_actual)
         self.children[index].disabled = True
 
-        # Verificar si el juego ha terminado
         if await self.check_endgame(interaction):
             return
 
-        # Cambiar el turno al siguiente jugador
         if self.game.modo_vs_bot:
             self.game.jugador_actual = self.game.bot_marker
             await interaction.response.edit_message(view=self)
             await self.bot_move(interaction)
         else:
             self.game.jugador_actual = "O" if self.game.jugador_actual == "X" else "X"
-
-            # Actualizar el embed dinámicamente
             embed = discord.Embed(
                 title="🎲 ¡Tres en raya!",
                 description=(
@@ -413,7 +412,99 @@ class TicTacToeView(View):
             )
             await interaction.response.edit_message(embed=embed, view=self)
 
-# NUEVA VISTA PARA LA SELECCIÓN DE FICHA 
+# Vista para el mensaje final: "Juego terminado" con botones "Reiniciar" y "Terminar"
+class GameEndView(discord.ui.View):
+    def __init__(self, game, original_channel):
+        super().__init__(timeout=180)
+        self.game = game
+        self.original_channel = original_channel
+
+    @discord.ui.button(label="Reiniciar", style=discord.ButtonStyle.success)
+    async def reiniciar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        guild_id = self.game.guild_id
+        dificultad = self.game.dificultad
+        jugadores = self.game.jugadores
+
+        if bot.user.mention in jugadores.values():
+            user_ficha = "O" if jugadores["X"] == bot.user.mention else "X"
+            await interaction.response.defer()
+            await reiniciar_partida(interaction, None, dificultad, user_ficha, jugadores=jugadores)
+        else:
+            user_ficha = "X" if interaction.user.mention == jugadores["X"] else "O"
+            await interaction.response.defer()
+            oponente = interaction.guild.get_member(int(jugadores["X"].strip("<@!>"))) if user_ficha == "O" else interaction.guild.get_member(int(jugadores["O"].strip("<@!>")))
+            await reiniciar_partida(interaction, oponente, None, user_ficha, jugadores=jugadores)
+
+        # Deshabilitar botones después de la interacción
+        for child in self.children:
+            child.disabled = True
+        await interaction.edit_original_response(view=self)
+
+    @discord.ui.button(label="Terminar", style=discord.ButtonStyle.danger)
+    async def terminar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Responder a la interacción para evitar errores
+        await interaction.response.defer()
+
+        # Deshabilitar todos los botones
+        for child in self.children:
+            child.disabled = True
+
+        # Actualizar el embed para indicar que la partida se terminó
+        embed = discord.Embed(
+            title="Juego terminado",
+            description="La partida se ha terminado.",
+            color=discord.Color.purple()
+        )
+
+        # Editar el mensaje original para que todos vean el cambio
+        await interaction.message.edit(embed=embed, view=self)
+
+        # Detener la vista para que no acepte más interacciones
+        self.stop()
+
+# Función auxiliar para reiniciar la partida usando la configuración anterior
+async def reiniciar_partida(interaction: discord.Interaction, oponente: discord.Member, dificultad: str, user_ficha: str, *, jugadores=None):
+    game = TicTacToeGame(interaction.guild.id, dificultad=dificultad if dificultad else "medio")
+    game.partida_activa = True
+    if jugadores:
+        game.jugadores = jugadores
+        if bot.user.mention in jugadores.values():
+            game.modo_vs_bot = True
+            game.bot_marker = "X" if jugadores["X"] == bot.user.mention else "O"
+    else:
+        if oponente and oponente.id != bot.user.id:
+            if user_ficha == "X":
+                game.jugadores = {"X": interaction.user.mention, "O": oponente.mention}
+            else:
+                game.jugadores = {"X": oponente.mention, "O": interaction.user.mention}
+        else:
+            game.modo_vs_bot = True
+            if user_ficha == "X":
+                game.jugadores = {"X": interaction.user.mention, "O": bot.user.mention}
+                game.bot_marker = "O"
+            else:
+                game.jugadores = {"X": bot.user.mention, "O": interaction.user.mention}
+                game.bot_marker = "X"
+    game.jugador_actual = "X"
+
+    view = TicTacToeView(game, interaction.id)
+    embed = discord.Embed(
+        title="🎲 ¡Tres en raya!",
+        description=(
+            f"{game.jugadores['X']} vs {game.jugadores['O']}\n\n"
+            "🎮 ¡QUE COMIENCE EL JUEGO! 🎮\n\n"
+            f"🔄 Turno de {game.jugadores[game.jugador_actual]} con {FICHAS[game.jugador_actual]}!"
+        ),
+        color=discord.Color.blue()
+    )
+    message = await interaction.channel.send(embed=embed, view=view)
+    partidas[interaction.id] = game
+    save_partidas()
+    view.message = message
+    if game.modo_vs_bot and ((user_ficha == "O") or (user_ficha == "X" and game.bot_marker == "X")):
+        await view.bot_move(interaction, first_turn=True)
+
+# Vista para la selección de ficha
 class TokenSelectionView(discord.ui.View):
     def __init__(self, original_interaction: discord.Interaction, oponente: discord.Member, dificultad: str):
         super().__init__(timeout=60)
@@ -426,23 +517,15 @@ class TokenSelectionView(discord.ui.View):
         if interaction.user.id != self.original_interaction.user.id:
             await interaction.response.send_message("No puedes seleccionar esta opción.", ephemeral=True)
             return
-        # Defer para ganar tiempo y poder editar la respuesta original
         await interaction.response.defer(ephemeral=True)
-
-        # Deshabilitar ambos botones.
-        # - Mantenemos el color del botón pulsado
-        # - El otro botón lo ponemos en gris
         for child in self.children:
             child.disabled = True
             if child != button:
                 child.style = discord.ButtonStyle.secondary
-
         try:
             await interaction.edit_original_response(view=self)
         except Exception as e:
             print("Error al editar el mensaje:", e)
-
-        # Iniciar la partida con "X"
         await iniciar_partida(self.original_interaction, self.oponente, self.dificultad, "X")
         self.stop()
 
@@ -452,35 +535,26 @@ class TokenSelectionView(discord.ui.View):
             await interaction.response.send_message("No puedes seleccionar esta opción.", ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True)
-
-        # Deshabilitar ambos botones.
-        # - Mantenemos el color del botón pulsado
-        # - El otro botón lo ponemos en gris
         for child in self.children:
             child.disabled = True
             if child != button:
                 child.style = discord.ButtonStyle.secondary
-
         try:
             await interaction.edit_original_response(view=self)
         except Exception as e:
             print("Error al editar el mensaje:", e)
-
-        # Iniciar la partida con "O" y permitir que el bot haga el primer movimiento
         await iniciar_partida(self.original_interaction, self.oponente, self.dificultad, "O", bot_first=True)
         self.stop()
 
-# FUNCIÓN PARA INICIAR LA PARTIDA SEGÚN LA FICHA SELECCIONADA
+# Función para iniciar la partida según la ficha seleccionada
 async def iniciar_partida(interaction: discord.Interaction, oponente: discord.Member, dificultad: str, user_ficha: str, bot_first: bool = False):
     if oponente is not None and oponente.id != bot.user.id:
-        # Configuración para partida contra otro usuario
         game = TicTacToeGame(interaction.guild.id)
         if user_ficha == "X":
             game.jugadores = {"X": interaction.user.mention, "O": oponente.mention}
         else:
             game.jugadores = {"X": oponente.mention, "O": interaction.user.mention}
     else:
-        # Configuración para partida contra el bot
         dificultad = dificultad if dificultad else "medio"
         game = TicTacToeGame(interaction.guild.id, dificultad=dificultad)
         game.modo_vs_bot = True
@@ -491,7 +565,6 @@ async def iniciar_partida(interaction: discord.Interaction, oponente: discord.Me
             game.jugadores = {"X": bot.user.mention, "O": interaction.user.mention}
             game.bot_marker = "X"
 
-    # El jugador con la ficha "X" siempre comienza
     game.jugador_actual = "X"
     game.partida_activa = True
 
@@ -500,24 +573,18 @@ async def iniciar_partida(interaction: discord.Interaction, oponente: discord.Me
         title="🎲 ¡Tres en raya!",
         description=(
             f"{game.jugadores['X']} vs {game.jugadores['O']}\n\n"
-            f"🎮 ¡QUE COMIENCE EL JUEGO! 🎮\n\n"
+            "🎮 ¡QUE COMIENCE EL JUEGO! 🎮\n\n"
             f"🔄 Turno de {game.jugadores[game.jugador_actual]} con {FICHAS[game.jugador_actual]}!"
         ),
         color=discord.Color.blue()
     )
-    # Enviar el mensaje inicial del juego
     message = await interaction.followup.send(embed=embed, view=view)
     partidas[interaction.id] = game
     save_partidas()
-
-    # Asignar el mensaje a la vista
     view.message = message
-
-    # Si el bot debe comenzar, realizar su movimiento inicial
     if bot_first and game.modo_vs_bot:
         await view.bot_move(interaction, first_turn=True)
 
-# COMANDO /INICIAR
 @bot.tree.command(name="start", description="Inicia una partida de Tres en Raya.")
 @app_commands.describe(
     oponente="Menciona un oponente para jugar contra él, o déjalo vacío para jugar contra el bot.",
@@ -535,25 +602,16 @@ async def start(
     oponente: discord.Member = None, 
     dificultad: app_commands.Choice[str] = None
 ):
-    # Si se especifica un oponente que no sea el bot...
     if oponente is not None and oponente.id != bot.user.id:
-        # ... y a la vez se elige dificultad, no permitimos la partida.
         if dificultad is not None:
             await interaction.response.send_message(
                 "⚠️ No puedes establecer dificultad cuando juegas contra otro usuario.",
                 ephemeral=True
             )
             return
-        # Si solo se indica oponente, se procede a jugar contra el usuario.
         dificultad_value = None
     else:
-        # Si no se especifica oponente (o es el bot) y no se eligió dificultad, asignamos por defecto.
-        if dificultad is None:
-            dificultad_value = "medio"
-        else:
-            dificultad_value = dificultad.value
-
-    # Continuar con la partida creando la vista y el embed
+        dificultad_value = dificultad.value if dificultad else "medio"
     view = TokenSelectionView(interaction, oponente, dificultad_value)
     embed = discord.Embed(
         title="🎲 ¡Tres en raya!",
@@ -568,17 +626,13 @@ async def stats_command(interaction: discord.Interaction, usuario: discord.Membe
     await interaction.response.defer()
     guild_id = interaction.guild.id
     user = usuario.mention if usuario else interaction.user.mention
-
-    # Obtener el nombre o apodo del usuario
     user_display_name = usuario.display_name if usuario else interaction.user.display_name
-
     cursor.execute("SELECT wins, losses, draws FROM stats WHERE guild_id = %s AND user = %s", (guild_id, user))
     result = cursor.fetchone()
     if result:
         wins, losses, draws = result
     else:
         wins, losses, draws = 0, 0, 0
-
     embed = discord.Embed(
         title=f"📊 Estadísticas de {user_display_name}",
         description=f"Victorias: {wins}\nDerrotas: {losses}\nEmpates: {draws}",
@@ -590,8 +644,6 @@ async def stats_command(interaction: discord.Interaction, usuario: discord.Membe
 async def leaderboard(interaction: discord.Interaction):
     await interaction.response.defer()
     guild_id = interaction.guild.id
-
-    # Consultar el top 100 de jugadores con más victorias
     cursor.execute("""
         SELECT user, wins FROM stats
         WHERE guild_id = %s
@@ -599,29 +651,21 @@ async def leaderboard(interaction: discord.Interaction):
         LIMIT 100
     """, (guild_id,))
     results = cursor.fetchall()
-
     if not results:
         await interaction.followup.send("⚠️ No hay datos disponibles para mostrar la tabla de posiciones.")
         return
-
     leaderboard_text = ""
-    excluded_user_id = 1334910035054297131  # ID del usuario "La Vieja" que debe ser excluido
+    excluded_user_id = 1334910035054297131  # ID del usuario "La Vieja" a excluir
     position = 1
-
     for user_mention, wins in results:
         try:
             user_id = int(user_mention.strip("<@!>"))
         except Exception:
             continue
-
-        # Excluir al usuario "La Vieja"
         if user_id == excluded_user_id:
             continue
-
-        # Mencionamos al usuario correctamente en el ranking
         leaderboard_text += f"**#{position}** - {wins} Pts. <@{user_id}>\n"
         position += 1
-
     embed = discord.Embed(
         title="🏆 Tabla de posiciones:",
         description=leaderboard_text,
@@ -639,8 +683,8 @@ async def help_command(interaction: discord.Interaction):
             "`/start |dificultad|` - Define la dificultad contra el bot.\n"
             "\n`/stats` - Muestra tus estadísticas.\n"
             "`/stats |usuario|` - Muestra las estadísticas de otro usuario.\n"
-            "`/leaderboard` - Tabla de posiciones.\n"
-            "`/help` - Este mensaje de ayuda."
+            "\n`/leaderboard` - Tabla de posiciones.\n"
+            "\n`/help` - Este mensaje de ayuda."
         ),
         color=discord.Color.blue()
     )
@@ -652,8 +696,6 @@ async def on_ready():
     load_stats()
     await bot.tree.sync()
     print(f"Bot conectado como {bot.user}")
-
-        # Estado del bot
     activity = discord.Game(name="La Vieja ❎🅾️")
     await bot.change_presence(activity=activity)
 
