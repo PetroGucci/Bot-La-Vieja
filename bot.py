@@ -370,7 +370,7 @@ class TicTacToeView(View):
     async def handle_click(self, interaction: discord.Interaction, index: int):
         if not self.game.partida_activa:
             await interaction.response.send_message(
-                "⚠️ No hay una partida en curso. Usa `/iniciar` para jugar.",
+                "⚠️ No hay una partida en curso. Usa `/start` para jugar.",
                 ephemeral=True
             )
             return
@@ -518,7 +518,7 @@ async def iniciar_partida(interaction: discord.Interaction, oponente: discord.Me
         await view.bot_move(interaction, first_turn=True)
 
 # COMANDO /INICIAR
-@bot.tree.command(name="iniciar", description="Inicia una partida de Tres en Raya.")
+@bot.tree.command(name="start", description="Inicia una partida de Tres en Raya.")
 @app_commands.describe(
     oponente="Menciona un oponente para jugar contra él, o déjalo vacío para jugar contra el bot.",
     dificultad="Selecciona la dificultad (solo disponible contra el bot)."
@@ -530,7 +530,7 @@ async def iniciar_partida(interaction: discord.Interaction, oponente: discord.Me
         app_commands.Choice(name="Difícil", value="dificil")
     ]
 )
-async def iniciar(
+async def start(
     interaction: discord.Interaction, 
     oponente: discord.Member = None, 
     dificultad: app_commands.Choice[str] = None
@@ -566,29 +566,24 @@ async def iniciar(
 async def stats_command(interaction: discord.Interaction, usuario: discord.Member = None):
     await interaction.response.defer()
     guild_id = interaction.guild.id
+    user = usuario.mention if usuario else interaction.user.mention
 
-    # Si no se menciona a nadie, usamos al autor del comando
-    member = usuario or interaction.user
+    # Obtener el nombre o apodo del usuario
+    user_display_name = usuario.display_name if usuario else interaction.user.display_name
 
-    # Construimos la mención en formato <@ID>
-    user_mention = f"<@{member.id}>"
-
-    # Buscamos las estadísticas usando esa mención
-    cursor.execute("SELECT wins, losses, draws FROM stats WHERE guild_id = %s AND user = %s", (guild_id, user_mention))
+    cursor.execute("SELECT wins, losses, draws FROM stats WHERE guild_id = %s AND user = %s", (guild_id, user))
     result = cursor.fetchone()
-
     if result:
         wins, losses, draws = result
     else:
         wins, losses, draws = 0, 0, 0
 
     embed = discord.Embed(
-        title=f"📊 Estadísticas",
-        description=f"{user_mention}**:**\nVictorias: {wins}\nDerrotas: {losses}\nEmpates: {draws}",
+        title=f"📊 Estadísticas de {user_display_name}",
+        description=f"Victorias: {wins}\nDerrotas: {losses}\nEmpates: {draws}",
         color=discord.Color.green()
     )
-    # Si deseas que todos vean el resultado, pon ephemeral=False
-    await interaction.followup.send(embed=embed, ephemeral=False)
+    await interaction.followup.send(embed=embed)
 
 @bot.tree.command(name="leaderboard", description="Muestra el top de jugadores con más victorias.")
 async def leaderboard(interaction: discord.Interaction):
@@ -638,11 +633,11 @@ async def help_command(interaction: discord.Interaction):
     embed = discord.Embed(
         title="🤖 Ayuda del Bot",
         description=(
-            "`/iniciar` - Inicia una partida de Tres en Raya.\n"
-            "`/iniciar @usuario` - Inicia una partida contra otro usuario.\n"
-            "`/iniciar dificultad` - Inicia una partida contra el bot con la dificultad especificada.\n"
-            "`/stats` - Muestra tus estadísticas.\n"
-            "`/stats @usuario` - Muestra las estadísticas de otro usuario.\n"
+            "`/start` - Inicia una partida de Tres en Raya.\n"
+            "`/start |dificultad|` - Define la dificultad contra el bot.\n"
+            "`/start |oponente|` - Inicia una partida contra otro usuario.\n"
+            "\n`/stats` - Muestra tus estadísticas.\n"
+            "`/stats |usuario|` - Muestra las estadísticas de otro usuario.\n"
             "`/leaderboard` - Tabla de posiciones.\n"
             "`/help` - Este mensaje de ayuda."
         ),
