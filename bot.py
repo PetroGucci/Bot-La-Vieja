@@ -535,30 +535,31 @@ async def start(
     oponente: discord.Member = None, 
     dificultad: app_commands.Choice[str] = None
 ):
-    # 1. Comprobamos si el oponente es distinto del bot.
+    # Si se especifica un oponente que no sea el bot...
     if oponente is not None and oponente.id != bot.user.id:
-        # Si alguien eligió dificultad también, lo anulamos y avisamos.
+        # ... y a la vez se elige dificultad, no permitimos la partida.
         if dificultad is not None:
             await interaction.response.send_message(
-                "⚠️ El nivel de dificultad no se puede establecer al jugar contra otro usuario.\n"
-                "Ignorando la dificultad y comenzando partida entre jugadores...",
+                "⚠️ No puedes establecer dificultad cuando juegas contra otro usuario.",
                 ephemeral=True
             )
-        # Forzamos dificultad a None porque no aplica vs. humano
+            return
+        # Si solo se indica oponente, se procede a jugar contra el usuario.
         dificultad_value = None
     else:
-        # 2. Si no se especifica oponente (o es el bot), tomamos la dificultad elegida.
-        dificultad_value = dificultad.value if dificultad else "medio"
+        # Si no se especifica oponente (o es el bot) y no se eligió dificultad, asignamos por defecto.
+        if dificultad is None:
+            dificultad_value = "medio"
+        else:
+            dificultad_value = dificultad.value
 
-    # 3. Construimos la vista y el embed para el juego
+    # Continuar con la partida creando la vista y el embed
     view = TokenSelectionView(interaction, oponente, dificultad_value)
     embed = discord.Embed(
         title="🎲 ¡Tres en raya!",
         description="Selecciona tu ficha:",
         color=discord.Color.blue()
     )
-
-    # 4. Enviamos el mensaje con la vista y el embed
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 @bot.tree.command(name="stats", description="Muestra las estadísticas de tus partidas o las de otro usuario")
