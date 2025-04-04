@@ -412,54 +412,56 @@ class TicTacToeView(View):
             )
             await interaction.response.edit_message(embed=embed, view=self)
 
-# Vista para el mensaje final: "Juego terminado" con botones "Reiniciar" y "Terminar"
 class GameEndView(discord.ui.View):
     def __init__(self, game, original_channel):
         super().__init__(timeout=180)
         self.game = game
         self.original_channel = original_channel
 
+    def es_jugador_actual(self, user):
+        return user.mention in self.game.jugadores.values()
+
     @discord.ui.button(label="Reiniciar", style=discord.ButtonStyle.success)
     async def reiniciar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.es_jugador_actual(interaction.user):
+            await interaction.response.send_message("❌ Solo los jugadores de esta partida pueden usar este botón.", ephemeral=True)
+            return
+
         guild_id = self.game.guild_id
         dificultad = self.game.dificultad
         jugadores = self.game.jugadores
 
+        await interaction.response.defer()
+
         if bot.user.mention in jugadores.values():
             user_ficha = "O" if jugadores["X"] == bot.user.mention else "X"
-            await interaction.response.defer()
             await reiniciar_partida(interaction, None, dificultad, user_ficha, jugadores=jugadores)
         else:
             user_ficha = "X" if interaction.user.mention == jugadores["X"] else "O"
-            await interaction.response.defer()
             oponente = interaction.guild.get_member(int(jugadores["X"].strip("<@!>"))) if user_ficha == "O" else interaction.guild.get_member(int(jugadores["O"].strip("<@!>")))
             await reiniciar_partida(interaction, oponente, None, user_ficha, jugadores=jugadores)
 
-        # Deshabilitar botones después de la interacción
         for child in self.children:
             child.disabled = True
         await interaction.edit_original_response(view=self)
 
     @discord.ui.button(label="Terminar", style=discord.ButtonStyle.danger)
     async def terminar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Responder a la interacción para evitar errores
+        if not self.es_jugador_actual(interaction.user):
+            await interaction.response.send_message("❌ Solo los jugadores de esta partida pueden usar este botón.", ephemeral=True)
+            return
+
         await interaction.response.defer()
 
-        # Deshabilitar todos los botones
         for child in self.children:
             child.disabled = True
 
-        # Actualizar el embed para indicar que la partida se terminó
         embed = discord.Embed(
             title="Juego terminado",
             description="La partida se ha terminado.",
             color=discord.Color.purple()
         )
-
-        # Editar el mensaje original para que todos vean el cambio
         await interaction.message.edit(embed=embed, view=self)
-
-        # Detener la vista para que no acepte más interacciones
         self.stop()
 
 # Función auxiliar para reiniciar la partida usando la configuración anterior
