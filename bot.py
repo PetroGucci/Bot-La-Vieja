@@ -669,7 +669,7 @@ async def leaderboard(interaction: discord.Interaction):
             continue
         # Ajustar posición solo si el puntaje cambia
         if (wins, losses) != (previous_wins, previous_losses):
-            position = len(leaderboard_text.split("\n")) + 1
+            position = leaderboard_text.count("\n") + 1
         leaderboard_text += f"**#{position}** - {wins} Pts. <@{user_id}>\n"
         previous_wins, previous_losses = wins, losses
     embed = discord.Embed(
